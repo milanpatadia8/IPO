@@ -1,0 +1,8 @@
+{
+  "name": "IPO Tracker India",
+  "description": "Comprehensive Indian IPO tracking platform for Mainboard and SME IPOs with live subscription status, Grey Market Premium (GMP) tracker, listing performance, and IPO calendar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

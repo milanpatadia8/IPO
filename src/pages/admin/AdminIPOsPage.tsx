@@ -3,18 +3,30 @@ import { IPO, IPOCategory, IPOExchange, IPOStatus, AnnouncementStatus, AdminUser
 import { api } from '../../lib/api';
 import { formatIndianDate, formatCrores } from '../../lib/calculations';
 import { StatusIndicator } from '../../components/StatusIndicator';
-import { Plus, Edit2, Trash2, CheckCircle, ExternalLink, Search, DollarSign } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, Search, AlertTriangle, X } from 'lucide-react';
 
 interface AdminIPOsPageProps {
   adminUser: AdminUser;
 }
 
+const normalizeUrl = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
 export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
   const [ipos, setIPOs] = useState<IPO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIpo, setEditingIpo] = useState<IPO | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [formError, setFormError] = useState('');
+  const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Listing result modal
   const [listingModalOpen, setListingModalOpen] = useState(false);
@@ -64,8 +76,16 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
     loadIPOs();
   }, []);
 
+  const showBanner = (type: 'success' | 'error', message: string) => {
+    setStatusBanner({ type, message });
+    setTimeout(() => {
+      setStatusBanner((prev) => (prev?.message === message ? null : prev));
+    }, 5000);
+  };
+
   const openCreateModal = () => {
     setEditingIpo(null);
+    setFormError('');
     setFormData({
       companyName: '',
       description: '',
@@ -95,6 +115,7 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
 
   const openEditModal = (ipo: IPO) => {
     setEditingIpo(ipo);
+    setFormError('');
     setFormData({
       companyName: ipo.company?.name || '',
       description: ipo.company?.description || '',
@@ -107,13 +128,13 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
       close_date: ipo.close_date || '',
       allotment_date: ipo.allotment_date || '',
       listing_date: ipo.listing_date || '',
-      price_band_min: ipo.price_band_min ? String(ipo.price_band_min) : '',
-      price_band_max: ipo.price_band_max ? String(ipo.price_band_max) : '',
-      issue_price: ipo.issue_price ? String(ipo.issue_price) : '',
-      lot_size: ipo.lot_size ? String(ipo.lot_size) : '',
-      issue_size: ipo.issue_size ? String(ipo.issue_size) : '',
-      fresh_issue_size: ipo.fresh_issue_size ? String(ipo.fresh_issue_size) : '',
-      offer_for_sale_size: ipo.offer_for_sale_size ? String(ipo.offer_for_sale_size) : '',
+      price_band_min: ipo.price_band_min !== undefined ? String(ipo.price_band_min) : '',
+      price_band_max: ipo.price_band_max !== undefined ? String(ipo.price_band_max) : '',
+      issue_price: ipo.issue_price !== undefined ? String(ipo.issue_price) : '',
+      lot_size: ipo.lot_size !== undefined ? String(ipo.lot_size) : '',
+      issue_size: ipo.issue_size !== undefined ? String(ipo.issue_size) : '',
+      fresh_issue_size: ipo.fresh_issue_size !== undefined ? String(ipo.fresh_issue_size) : '',
+      offer_for_sale_size: ipo.offer_for_sale_size !== undefined ? String(ipo.offer_for_sale_size) : '',
       registrar_name: ipo.registrar_name || '',
       registrar_url: ipo.registrar_url || '',
       drhp_url: ipo.drhp_url || 'https://www.sebi.gov.in/filings/public-issues.html',
@@ -124,32 +145,71 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      ...formData,
-      price_band_min: formData.price_band_min ? parseFloat(formData.price_band_min) : undefined,
-      price_band_max: formData.price_band_max ? parseFloat(formData.price_band_max) : undefined,
-      issue_price: formData.issue_price ? parseFloat(formData.issue_price) : undefined,
-      lot_size: formData.lot_size ? parseInt(formData.lot_size, 10) : undefined,
-      issue_size: formData.issue_size ? parseFloat(formData.issue_size) : undefined,
-      fresh_issue_size: formData.fresh_issue_size ? parseFloat(formData.fresh_issue_size) : undefined,
-      offer_for_sale_size: formData.offer_for_sale_size
-        ? parseFloat(formData.offer_for_sale_size)
-        : undefined,
-    };
+    setFormError('');
+    setSubmitting(true);
 
-    if (editingIpo) {
-      await api.adminUpdateIPO(editingIpo.id, payload, adminUser);
-    } else {
-      await api.adminCreateIPO(payload, adminUser);
+    try {
+      const parseNum = (val: string, isInt = false) => {
+        if (!val.trim()) return editingIpo ? null : undefined;
+        const parsed = isInt ? parseInt(val, 10) : parseFloat(val);
+        return Number.isFinite(parsed) ? parsed : editingIpo ? null : undefined;
+      };
+
+      const payload = {
+        ...formData,
+        companyName: formData.companyName.trim(),
+        registrar_url: normalizeUrl(formData.registrar_url),
+        drhp_url: normalizeUrl(formData.drhp_url),
+        rhp_url: normalizeUrl(formData.rhp_url),
+        price_band_min: parseNum(formData.price_band_min),
+        price_band_max: parseNum(formData.price_band_max),
+        issue_price: parseNum(formData.issue_price),
+        lot_size: parseNum(formData.lot_size, true),
+        issue_size: parseNum(formData.issue_size),
+        fresh_issue_size: parseNum(formData.fresh_issue_size),
+        offer_for_sale_size: parseNum(formData.offer_for_sale_size),
+      };
+
+      if (editingIpo) {
+        const updated = await api.adminUpdateIPO(editingIpo.id, payload, adminUser);
+        if (!updated) {
+          throw new Error('Could not update this IPO record on the server.');
+        }
+        showBanner('success', `Updated "${updated.company?.name || formData.companyName}" successfully.`);
+      } else {
+        const created = await api.adminCreateIPO(payload, adminUser);
+        showBanner('success', `Created "${created.company?.name || formData.companyName}" successfully.`);
+      }
+
+      setModalOpen(false);
+      await loadIPOs();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save IPO changes.';
+      setFormError(msg);
+      showBanner('error', msg);
+    } finally {
+      setSubmitting(false);
     }
-    setModalOpen(false);
-    loadIPOs();
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to permanently delete IPO "${name}"?`)) {
-      await api.adminDeleteIPO(id, adminUser);
-      loadIPOs();
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const ok = await api.adminDeleteIPO(deleteTarget.id, adminUser);
+      if (!ok) {
+        throw new Error('IPO record could not be deleted.');
+      }
+      const deletedName = deleteTarget.name;
+      setDeleteTarget(null);
+      showBanner('success', `Deleted "${deletedName}" successfully.`);
+      await loadIPOs();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete IPO.';
+      setDeleteTarget(null);
+      showBanner('error', msg);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -163,23 +223,31 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
   const handleRecordListing = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedIpoForListing || !listingPriceInput) return;
-    const issuePrice = selectedIpoForListing.issue_price || selectedIpoForListing.price_band_max || 100;
-    const listingPrice = parseFloat(listingPriceInput);
-    const firstDayClose = firstDayCloseInput ? parseFloat(firstDayCloseInput) : listingPrice;
+    setSubmitting(true);
+    try {
+      const issuePrice = selectedIpoForListing.issue_price || selectedIpoForListing.price_band_max || 100;
+      const listingPrice = parseFloat(listingPriceInput);
+      const firstDayClose = firstDayCloseInput ? parseFloat(firstDayCloseInput) : listingPrice;
 
-    await api.adminRecordListing(
-      {
-        ipo_id: selectedIpoForListing.id,
-        issue_price: issuePrice,
-        listing_price: listingPrice,
-        listing_date: selectedIpoForListing.listing_date || new Date().toISOString().split('T')[0],
-        first_day_close: firstDayClose,
-      },
-      adminUser
-    );
+      await api.adminRecordListing(
+        {
+          ipo_id: selectedIpoForListing.id,
+          issue_price: issuePrice,
+          listing_price: listingPrice,
+          listing_date: selectedIpoForListing.listing_date || new Date().toISOString().split('T')[0],
+          first_day_close: firstDayClose,
+        },
+        adminUser
+      );
 
-    setListingModalOpen(false);
-    loadIPOs();
+      setListingModalOpen(false);
+      showBanner('success', `Recorded listing result for "${selectedIpoForListing.company?.name || selectedIpoForListing.slug}".`);
+      await loadIPOs();
+    } catch (err: unknown) {
+      showBanner('error', err instanceof Error ? err.message : 'Failed to record listing result.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const filtered = ipos.filter((i) => {
@@ -211,6 +279,33 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
           <span>Create New IPO</span>
         </button>
       </div>
+
+      {statusBanner && (
+        <div
+          className={`p-3 rounded-md border text-xs flex items-center justify-between gap-2 ${
+            statusBanner.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {statusBanner.type === 'success' ? (
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{statusBanner.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusBanner(null)}
+            className="text-current opacity-70 hover:opacity-100 p-0.5"
+            aria-label="Dismiss message"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Search Input */}
       <div className="relative max-w-md">
@@ -278,15 +373,17 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                       </button>
                     )}
                     <button
+                      type="button"
                       onClick={() => openEditModal(ipo)}
-                      className="p-1 text-slate-600 hover:text-slate-900 rounded hover:bg-slate-100"
+                      className="p-1.5 text-slate-600 hover:text-slate-900 rounded hover:bg-slate-100"
                       title="Edit IPO"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(ipo.id, ipo.company?.name || ipo.slug)}
-                      className="p-1 text-rose-600 hover:text-rose-900 rounded hover:bg-rose-50"
+                      type="button"
+                      onClick={() => setDeleteTarget({ id: ipo.id, name: ipo.company?.name || ipo.slug })}
+                      className="p-1.5 text-rose-600 hover:text-rose-900 rounded hover:bg-rose-50"
                       title="Delete IPO"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -301,11 +398,28 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
 
       {/* Modal: Create or Edit IPO */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-lg border border-slate-200 shadow-xl max-w-2xl w-full p-6 my-8 space-y-4">
-            <h3 className="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">
-              {editingIpo ? 'Edit Offering Prospectus' : 'Create New Initial Public Offering'}
-            </h3>
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg border border-slate-200 shadow-xl max-w-2xl w-full p-6 my-auto max-h-[90vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900">
+                {editingIpo ? 'Edit Offering Prospectus' : 'Create New Initial Public Offering'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -459,7 +573,7 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                   <label className="block font-semibold text-slate-700 mb-1">Price Min (₹)</label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="any"
                     value={formData.price_band_min}
                     onChange={(e) => setFormData({ ...formData, price_band_min: e.target.value })}
                     className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded"
@@ -469,7 +583,7 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                   <label className="block font-semibold text-slate-700 mb-1">Price Max (₹)</label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="any"
                     value={formData.price_band_max}
                     onChange={(e) => setFormData({ ...formData, price_band_max: e.target.value })}
                     className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded"
@@ -479,6 +593,7 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                   <label className="block font-semibold text-slate-700 mb-1">Lot Size</label>
                   <input
                     type="number"
+                    step="1"
                     value={formData.lot_size}
                     onChange={(e) => setFormData({ ...formData, lot_size: e.target.value })}
                     className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded"
@@ -490,7 +605,7 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="any"
                     value={formData.issue_size}
                     onChange={(e) => setFormData({ ...formData, issue_size: e.target.value })}
                     className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded"
@@ -512,7 +627,8 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Registrar URL</label>
                   <input
-                    type="url"
+                    type="text"
+                    placeholder="https://linkintime.co.in"
                     value={formData.registrar_url}
                     onChange={(e) => setFormData({ ...formData, registrar_url: e.target.value })}
                     className="w-full h-8 px-2 bg-slate-50 border border-slate-200 rounded"
@@ -527,7 +643,7 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                     RHP Document URL (SEBI / ROC)
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     placeholder="https://www.sebi.gov.in/filings/public-issues.html"
                     value={formData.rhp_url}
                     onChange={(e) => setFormData({ ...formData, rhp_url: e.target.value })}
@@ -542,7 +658,7 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                     DRHP Document URL (SEBI Draft)
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     placeholder="https://www.sebi.gov.in/filings/public-issues.html"
                     value={formData.drhp_url}
                     onChange={(e) => setFormData({ ...formData, drhp_url: e.target.value })}
@@ -557,16 +673,24 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={submitting}
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 rounded text-slate-600 hover:bg-slate-50"
+                  className="px-4 py-2 border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-slate-900 text-white font-medium rounded hover:bg-slate-800"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-slate-900 text-white font-medium rounded hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {editingIpo ? 'Update Offering' : 'Save New IPO'}
+                  {submitting
+                    ? editingIpo
+                      ? 'Updating...'
+                      : 'Saving...'
+                    : editingIpo
+                    ? 'Update Offering'
+                    : 'Save New IPO'}
                 </button>
               </div>
             </form>
@@ -637,12 +761,51 @@ export const AdminIPOsPage: React.FC<AdminIPOsPageProps> = ({ adminUser }) => {
                 </button>
                 <button
                   type="submit"
-                  className="px-3.5 py-1.5 bg-emerald-700 text-white font-medium rounded hover:bg-emerald-800"
+                  disabled={submitting}
+                  className="px-3.5 py-1.5 bg-emerald-700 text-white font-medium rounded hover:bg-emerald-800 disabled:opacity-50"
                 >
-                  Confirm & Publish Listing
+                  {submitting ? 'Publishing...' : 'Confirm & Publish Listing'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Confirm Delete IPO (In-app modal replacing blocked window.confirm) */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-lg border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">Delete IPO Record</h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Are you sure you want to permanently delete <strong>{deleteTarget.name}</strong>? This action removes the IPO and its snapshots from the registry and logs an audit entry.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 text-xs">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+                className="px-3.5 py-2 border border-slate-200 rounded text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -6,25 +6,41 @@
 import { ipoStore } from './store';
 import { IPO, MarketSummary, FeedRun, AuditLog, AdminUser, IPOSource, IPOCategory, IPOStatus } from '../types/ipo';
 
+class ServerHttpError extends Error {
+  public status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 class ApiClient {
+  private buildAdminHeaders(admin: AdminUser): Record<string, string> {
+    return {
+      'x-admin-id': encodeURIComponent(admin.id || 'admin-1'),
+      'x-admin-name': encodeURIComponent(admin.full_name || 'Admin'),
+    };
+  }
+
   private async fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-    try {
-      const res = await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options?.headers || {}),
-        },
-      });
-      if (!res.ok) {
-        throw new Error(`HTTP Error ${res.status}: ${res.statusText}`);
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      let errMsg = `HTTP Error ${res.status}: ${res.statusText}`;
+      try {
+        const errBody = await res.json();
+        if (errBody?.error) errMsg = errBody.error;
+      } catch {
+        // ignore JSON parse failure on non-JSON error body
       }
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.warn(`[API Client] Fallback to local store for ${url}:`, err);
-      throw err;
+      throw new ServerHttpError(res.status, errMsg);
     }
+    return await res.json();
   }
 
   public async getMarketSummary(): Promise<MarketSummary> {
@@ -135,36 +151,56 @@ class ApiClient {
     try {
       const res = await this.fetchJson<{ success: boolean; data: IPO }>('/api/admin/ipos', {
         method: 'POST',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers: this.buildAdminHeaders(admin),
         body: JSON.stringify(payload),
       });
       return res.data;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.createIPO(payload, { id: admin.id, name: admin.full_name });
     }
   }
 
   public async adminUpdateIPO(id: string, payload: any, admin: AdminUser): Promise<IPO | undefined> {
+    const headers = this.buildAdminHeaders(admin);
     try {
-      const res = await this.fetchJson<{ success: boolean; data: IPO }>(`/api/admin/ipos/${id}`, {
+      const res = await this.fetchJson<{ success: boolean; data: IPO }>(`/api/admin/ipos/${encodeURIComponent(id)}`, {
         method: 'PATCH',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers,
         body: JSON.stringify(payload),
       });
       return res.data;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError && err.status === 405) {
+        const res = await this.fetchJson<{ success: boolean; data: IPO }>(`/api/admin/ipos/${encodeURIComponent(id)}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(payload),
+        });
+        return res.data;
+      }
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.updateIPO(id, payload, { id: admin.id, name: admin.full_name });
     }
   }
 
   public async adminDeleteIPO(id: string, admin: AdminUser): Promise<boolean> {
+    const headers = this.buildAdminHeaders(admin);
     try {
-      const res = await this.fetchJson<{ success: boolean }>(`/api/admin/ipos/${id}`, {
+      const res = await this.fetchJson<{ success: boolean }>(`/api/admin/ipos/${encodeURIComponent(id)}`, {
         method: 'DELETE',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers,
       });
       return res.success;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError && err.status === 405) {
+        const res = await this.fetchJson<{ success: boolean }>(`/api/admin/ipos/${encodeURIComponent(id)}/delete`, {
+          method: 'POST',
+          headers,
+        });
+        return res.success;
+      }
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.deleteIPO(id, { id: admin.id, name: admin.full_name });
     }
   }
@@ -173,11 +209,12 @@ class ApiClient {
     try {
       const res = await this.fetchJson<{ success: boolean; data: any }>('/api/admin/gmp', {
         method: 'POST',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers: this.buildAdminHeaders(admin),
         body: JSON.stringify(payload),
       });
       return res.data;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.addGMPSnapshot(payload, { id: admin.id, name: admin.full_name });
     }
   }
@@ -186,11 +223,12 @@ class ApiClient {
     try {
       const res = await this.fetchJson<{ success: boolean; data: any }>('/api/admin/subscriptions', {
         method: 'POST',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers: this.buildAdminHeaders(admin),
         body: JSON.stringify(payload),
       });
       return res.data;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.addSubscriptionSnapshot(payload, { id: admin.id, name: admin.full_name });
     }
   }
@@ -199,11 +237,12 @@ class ApiClient {
     try {
       const res = await this.fetchJson<{ success: boolean; data: any }>('/api/admin/listing-results', {
         method: 'POST',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers: this.buildAdminHeaders(admin),
         body: JSON.stringify(payload),
       });
       return res.data;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.recordListingResult(payload, { id: admin.id, name: admin.full_name });
     }
   }
@@ -212,23 +251,25 @@ class ApiClient {
     try {
       const res = await this.fetchJson<any>('/api/admin/imports', {
         method: 'POST',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers: this.buildAdminHeaders(admin),
         body: JSON.stringify({ csvText, dryRun }),
       });
       return res;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.importFromCSV(csvText, { id: admin.id, name: admin.full_name }, { dryRun });
     }
   }
 
   public async adminSyncFeed(sourceId: string, admin: AdminUser): Promise<FeedRun> {
     try {
-      const res = await this.fetchJson<{ success: boolean; data: FeedRun }>(`/api/admin/feeds/${sourceId}/sync`, {
+      const res = await this.fetchJson<{ success: boolean; data: FeedRun }>(`/api/admin/feeds/${encodeURIComponent(sourceId)}/sync`, {
         method: 'POST',
-        headers: { 'x-admin-id': admin.id, 'x-admin-name': admin.full_name },
+        headers: this.buildAdminHeaders(admin),
       });
       return res.data;
-    } catch {
+    } catch (err) {
+      if (err instanceof ServerHttpError) throw err;
       return ipoStore.syncProvider(sourceId, { id: admin.id, name: admin.full_name });
     }
   }

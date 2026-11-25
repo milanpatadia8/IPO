@@ -52,243 +52,174 @@ export const UpcomingIPOsPage: React.FC<UpcomingIPOsPageProps> = ({ navigate }) 
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Upcoming Indian IPOs Pipeline
+      <div className="space-y-2 border-b border-[#EAEAEA] pb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-[#111827] tracking-tight">
+          Upcoming Indian IPOs
         </h1>
-        <p className="text-sm text-slate-600 max-w-3xl">
-          Discover announced and expected initial public offerings. Officially confirmed dates and draft SEBI filings are clearly distinguished from market expectations.
+        <p className="text-base text-[#4B5563] max-w-2xl leading-relaxed">
+          Companies that have filed draft offer documents (DRHP) or announced issue dates with SEBI, NSE, and BSE.
         </p>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Search */}
+      <div className="bg-white border border-[#EAEAEA] rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Search upcoming IPOs by company name..."
+            placeholder="Search upcoming companies, sectors, or DRHP filings..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-md focus:bg-white focus:border-slate-400 outline-none transition-colors"
+            className="w-full h-10 pl-9 pr-3 text-sm bg-[#FAFAFA] border border-[#E5E7EB] focus:border-[#111827] rounded-lg outline-none text-[#111827] transition-colors"
           />
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#6B7280] absolute left-3 top-3 pointer-events-none" />
         </div>
 
-        {/* Filter Badges */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Category Filter */}
-          <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-md border border-slate-200">
+          <div className="flex items-center gap-1 p-1 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg">
             <button
               onClick={() => setCategoryFilter('all')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 categoryFilter === 'all'
-                  ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#111827] text-white font-medium'
+                  : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               All
             </button>
             <button
               onClick={() => setCategoryFilter('Mainboard')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 categoryFilter === 'Mainboard'
-                  ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#111827] text-white font-medium'
+                  : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               Mainboard
             </button>
             <button
               onClick={() => setCategoryFilter('SME')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 categoryFilter === 'SME'
-                  ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#111827] text-white font-medium'
+                  : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               SME
             </button>
           </div>
-
-          {/* Announcement Status Dropdown */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 outline-none hover:border-slate-300"
-          >
-            <option value="all">All Announcement Stages</option>
-            <option value="confirmed">Officially Confirmed</option>
-            <option value="dates_announced">Dates Announced</option>
-            <option value="expected">Expected / DRHP Filed</option>
-            <option value="awaiting_details">Awaiting Details</option>
-          </select>
         </div>
-      </div>
-
-      {/* SEBI Regulatory Filings Notice */}
-      <div className="bg-blue-50/70 border border-blue-200/80 rounded-lg p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2.5 text-blue-950">
-          <FileText className="w-4 h-4 text-blue-700 shrink-0" />
-          <span>
-            <strong>Official SEBI Offer Documents:</strong> Access verified Red Herring Prospectuses (RHP) & Draft Red Herring Prospectuses (DRHP) directly via the official SEBI Public Issues portal.
-          </span>
-        </div>
-        <a
-          href={SEBI_PUBLIC_ISSUES_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded font-medium text-xs shadow-xs transition-colors whitespace-nowrap shrink-0"
-        >
-          <span>SEBI Public Issues Filings</span>
-          <ExternalLink className="w-3 h-3" />
-        </a>
       </div>
 
       {/* Upcoming Table */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-              <tr>
-                <th className="py-3 px-4">Company Name</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Announcement Status</th>
-                <th className="py-3 px-4">Expected Open</th>
-                <th className="py-3 px-4">Expected Close</th>
-                <th className="py-3 px-4 text-right">Price Band</th>
-                <th className="py-3 px-4 text-right">Issue Size</th>
-                <th className="py-3 px-4 text-right">Latest GMP</th>
-                <th className="py-3 px-4">Official Links</th>
-                <th className="py-3 px-4 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
-              {filtered.length === 0 ? (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between border-b border-[#EAEAEA] pb-2">
+          <h2 className="text-lg font-semibold text-[#111827]">
+            Upcoming Issues ({filtered.length})
+          </h2>
+          <span className="text-xs text-[#4B5563]">DRHP &amp; announced pipeline</span>
+        </div>
+
+        {loading ? (
+          <div className="bg-white border border-[#EAEAEA] rounded-xl p-10 text-center text-[#4B5563] text-sm">
+            Loading upcoming issues...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white border border-[#EAEAEA] rounded-xl p-10 text-center text-[#4B5563] text-sm">
+            No upcoming IPO records match the selected filter criteria.
+          </div>
+        ) : (
+          <div className="overflow-x-auto bg-white border border-[#EAEAEA] rounded-xl">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-[#FAFAFA] border-b border-[#EAEAEA] text-[#4B5563] font-semibold text-xs">
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400 font-sans">
-                    No upcoming IPOs found matching the filter criteria.
-                  </td>
+                  <th className="py-3.5 px-4">Company</th>
+                  <th className="py-3.5 px-3">Expected Dates</th>
+                  <th className="py-3.5 px-3 text-right">Price Band</th>
+                  <th className="py-3.5 px-3 text-right">Est. Size</th>
+                  <th className="py-3.5 px-3 text-right">Early GMP</th>
+                  <th className="py-3.5 px-3">Stage</th>
+                  <th className="py-3.5 px-4 text-right">Action</th>
                 </tr>
-              ) : (
-                filtered.map((ipo) => (
-                  <tr key={ipo.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-4 font-sans">
-                      <div className="font-semibold text-slate-900">
+              </thead>
+              <tbody className="divide-y divide-[#EAEAEA] bg-white">
+                {filtered.map((ipo) => (
+                  <tr
+                    key={ipo.id}
+                    onClick={() => navigate(`/ipo/${ipo.slug}`)}
+                    className="hover:bg-[#FAFAFA] transition-colors cursor-pointer group"
+                  >
+                    <td className="py-4 px-4">
+                      <div className="font-semibold text-[#111827] text-sm sm:text-[15px]">
                         {ipo.company?.name || ipo.slug}
                       </div>
-                      <div className="text-[11px] text-slate-500 font-normal">
-                        {ipo.company?.industry || 'Diversified'}
-                      </div>
-                    </td>
-
-                    <td className="py-3.5 px-4 font-sans text-slate-700">
-                      {ipo.category} ({ipo.exchange})
-                    </td>
-
-                    <td className="py-3.5 px-4 font-sans">
-                      <StatusIndicator
-                        status={ipo.status}
-                        announcementStatus={ipo.announcement_status}
-                      />
-                    </td>
-
-                    <td className="py-3.5 px-4 font-sans text-slate-800">
-                      {ipo.open_date ? (
-                        <span>{formatIndianDate(ipo.open_date)}</span>
-                      ) : (
-                        <span className="text-slate-400">Not announced</span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 px-4 font-sans text-slate-800">
-                      {ipo.close_date ? (
-                        <span>{formatIndianDate(ipo.close_date)}</span>
-                      ) : (
-                        <span className="text-slate-400">Not announced</span>
-                      )}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right text-slate-900">
-                      {ipo.price_band_min && ipo.price_band_max
-                        ? `₹${ipo.price_band_min} - ₹${ipo.price_band_max}`
-                        : 'Not announced'}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right font-semibold text-slate-900">
-                      {ipo.issue_size ? formatCrores(ipo.issue_size) : 'Not announced'}
-                    </td>
-
-                    <td className="py-3.5 px-4 text-right">
-                      <GMPDisplay
-                        latestGmp={ipo.latest_gmp}
-                        basePrice={ipo.price_band_max}
-                        compact
-                      />
-                    </td>
-
-                    <td className="py-3.5 px-4 font-sans">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <a
-                          href={getValidDocUrl(ipo.rhp_url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-blue-700 hover:text-blue-900 hover:underline"
-                          title="View Red Herring Prospectus (SEBI Filing)"
-                        >
-                          <span>RHP</span>
-                          <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-                        </a>
-                        <span className="text-slate-300" aria-hidden="true">·</span>
-                        <a
-                          href={getValidDocUrl(ipo.drhp_url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-0.5 text-[11px] font-medium text-slate-700 hover:text-slate-900 hover:underline"
-                          title="View Draft Red Herring Prospectus (SEBI Filing)"
-                        >
-                          <span>DRHP</span>
-                          <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-                        </a>
-                        <span className="text-slate-300" aria-hidden="true">·</span>
-                        {ipo.registrar_name ? (
-                          ipo.registrar_url ? (
-                            <a
-                              href={ipo.registrar_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-slate-600 hover:text-slate-900 text-[11px] truncate max-w-[100px] block hover:underline"
-                              title={ipo.registrar_name}
-                            >
-                              {ipo.registrar_name.split(' ')[0]}
-                            </a>
-                          ) : (
-                            <span className="text-slate-600 text-[11px] truncate max-w-[100px] block" title={ipo.registrar_name}>
-                              {ipo.registrar_name.split(' ')[0]}
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-slate-300 text-[11px]">Registrar TBA</span>
+                      <div className="text-xs text-[#4B5563] flex items-center gap-1.5 mt-0.5">
+                        <span>{ipo.category}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{ipo.exchange}</span>
+                        {ipo.company?.industry && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span>{ipo.company.industry}</span>
+                          </>
                         )}
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 text-center font-sans">
+                    <td className="py-4 px-3 whitespace-nowrap tabular-nums text-sm text-[#111827]">
+                      {ipo.open_date ? (
+                        <div>{formatIndianDate(ipo.open_date)} – {formatIndianDate(ipo.close_date)}</div>
+                      ) : (
+                        <span className="text-[#4B5563]">Dates TBA</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-3 text-right tabular-nums whitespace-nowrap text-[#111827] font-medium">
+                      {ipo.price_band_min && ipo.price_band_max
+                        ? `₹${ipo.price_band_min} – ₹${ipo.price_band_max}`
+                        : ipo.price_band_max
+                        ? `₹${ipo.price_band_max}`
+                        : 'TBA'}
+                    </td>
+
+                    <td className="py-4 px-3 text-right tabular-nums font-medium text-[#111827]">
+                      {formatCrores(ipo.issue_size)}
+                    </td>
+
+                    <td className="py-4 px-3 text-right tabular-nums whitespace-nowrap">
+                      {ipo.latest_gmp ? (
+                        <span className={ipo.latest_gmp.gmp_amount >= 0 ? 'text-[#16A34A] font-medium' : 'text-[#DC2626] font-medium'}>
+                          {ipo.latest_gmp.gmp_amount >= 0 ? `+₹${ipo.latest_gmp.gmp_amount}` : `-₹${Math.abs(ipo.latest_gmp.gmp_amount)}`}
+                        </span>
+                      ) : (
+                        <span className="text-[#6B7280]">—</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-3 whitespace-nowrap">
+                      <span className={`text-sm font-medium ${ipo.announcement_status === 'dates_announced' ? 'text-[#16A34A]' : 'text-[#4B5563]'}`}>
+                        {ipo.announcement_status === 'dates_announced' ? 'Dates Confirmed' : 'DRHP Filed'}
+                      </span>
+                    </td>
+
+                    <td className="py-4 px-4 text-right whitespace-nowrap">
                       <button
-                        onClick={() => navigate(`/ipo/${ipo.slug}`)}
-                        className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/ipo/${ipo.slug}`);
+                        }}
+                        className="px-3.5 py-1.5 bg-white border border-[#E5E7EB] hover:bg-[#FAFAFA] hover:border-[#111827] text-[#111827] text-sm font-medium rounded-lg transition-colors"
                       >
                         Details
                       </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

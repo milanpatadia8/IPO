@@ -78,242 +78,261 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({ navigate }) => {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#EAEAEA] pb-6">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Indian IPO Event Calendar
+          <h1 className="text-2xl sm:text-3xl font-semibold text-[#111827] tracking-tight">
+            IPO Event Calendar
           </h1>
-          <p className="text-sm text-slate-600">
-            Chronological timetable of issue opens, bidding closes, allotment declarations, and exchange listings.
+          <p className="text-base text-[#4B5563] leading-relaxed">
+            Chronological timetable of issue opens, closes, allotment declarations, and exchange listings.
           </p>
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200 self-start sm:self-auto">
+        <div className="flex items-center gap-1 p-1 bg-white border border-[#EAEAEA] rounded-lg self-start sm:self-auto">
           <button
             onClick={() => setViewMode('chronological')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+            className={`px-3.5 py-1.5 text-sm rounded-md transition-colors ${
               viewMode === 'chronological'
-                ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
-            Chronological Schedule
+            Schedule
           </button>
           <button
             onClick={() => setViewMode('month')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+            className={`px-3.5 py-1.5 text-sm rounded-md transition-colors ${
               viewMode === 'month'
-                ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
-            Monthly Calendar
+            Month Grid
           </button>
         </div>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
-        {/* Category Tabs */}
-        <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-md border border-slate-200">
+      <div className="bg-white border border-[#EAEAEA] rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-1 p-1 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg">
           <button
             onClick={() => setCategoryFilter('all')}
-            className={`px-3 py-1 text-xs rounded transition-colors ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
               categoryFilter === 'all'
-                ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
             All Categories
           </button>
           <button
             onClick={() => setCategoryFilter('Mainboard')}
-            className={`px-3 py-1 text-xs rounded transition-colors ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
               categoryFilter === 'Mainboard'
-                ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
             Mainboard
           </button>
           <button
             onClick={() => setCategoryFilter('SME')}
-            className={`px-3 py-1 text-xs rounded transition-colors ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
               categoryFilter === 'SME'
-                ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
-            SME Emerge
+            SME
           </button>
         </div>
 
-        {/* Event Type Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium">Event Stage:</span>
+          <span className="text-sm text-[#4B5563]">Filter Event:</span>
           <select
             value={eventTypeFilter}
             onChange={(e) => setEventTypeFilter(e.target.value)}
-            className="h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-md text-slate-700 outline-none hover:border-slate-300"
+            className="text-sm bg-white border border-[#E5E7EB] rounded-lg px-3 py-2 text-[#111827] outline-none focus:border-[#111827]"
           >
             <option value="all">All Events</option>
             <option value="Issue Opens">Issue Opens</option>
             <option value="Issue Closes">Issue Closes</option>
             <option value="Basis of Allotment">Basis of Allotment</option>
-            <option value="Exchange Listing">Exchange Listing</option>
+            <option value="Initiation of Refunds">Initiation of Refunds</option>
+            <option value="Credit of Shares to Demat">Credit to Demat</option>
+            <option value="Listing Date">Listing Date</option>
           </select>
         </div>
       </div>
 
-      {/* Chronological List View */}
-      {viewMode === 'chronological' && (
+      {/* Main Calendar View Area */}
+      {loading ? (
+        <div className="bg-white border border-[#EAEAEA] rounded-xl p-12 text-center text-[#4B5563] text-sm">
+          Loading calendar schedule...
+        </div>
+      ) : viewMode === 'chronological' ? (
         <div className="space-y-8">
           {Object.keys(eventsByMonth).length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-lg p-12 text-center text-slate-400 text-xs">
-              No calendar events found for this filter.
+            <div className="bg-white border border-[#EAEAEA] rounded-xl p-12 text-center text-[#4B5563] text-sm">
+              No calendar events found for the active filter settings.
             </div>
           ) : (
-            Object.entries(eventsByMonth).map(([monthTitle, monthEvents]) => (
-              <div key={monthTitle} className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                    {monthTitle}
-                  </h3>
-                  <div className="h-px bg-slate-200 flex-1" />
+            Object.entries(eventsByMonth).map(([month, monthEvents]) => (
+              <div key={month} className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-[#EAEAEA] pb-2">
+                  <CalendarIcon className="w-4 h-4 text-[#111827]" />
+                  <h2 className="text-lg font-semibold text-[#111827]">{month}</h2>
+                  <span className="text-xs text-[#4B5563]">({monthEvents.length} events)</span>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
-                  {monthEvents.map((ev, idx) => {
-                    let badgeColor = 'text-slate-700 bg-slate-50 border-slate-200';
-                    if (ev.event_type === 'Issue Opens')
-                      badgeColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
-                    if (ev.event_type === 'Issue Closes')
-                      badgeColor = 'text-amber-800 bg-amber-50 border-amber-200';
-                    if (ev.event_type === 'Exchange Listing')
-                      badgeColor = 'text-indigo-700 bg-indigo-50 border-indigo-200';
-                    if (ev.event_type === 'Basis of Allotment')
-                      badgeColor = 'text-sky-700 bg-sky-50 border-sky-200';
-
-                    return (
-                      <div
-                        key={`${ev.ipo_id}-${ev.event_type}-${idx}`}
-                        className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
-                      >
-                        <div className="flex items-start sm:items-center gap-4">
-                          <div className="w-24 shrink-0 font-mono tabular-nums text-xs font-semibold text-slate-900">
-                            {formatIndianDate(ev.event_date)}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${badgeColor}`}
-                              >
-                                {ev.event_type}
-                              </span>
-                              <span className="text-xs font-medium text-slate-500">
-                                {ev.category}
-                              </span>
-                            </div>
-                            <h4
-                              onClick={() => navigate(`/ipo/${ev.slug}`)}
-                              className="text-sm font-bold text-slate-900 hover:text-slate-700 cursor-pointer mt-0.5"
-                            >
-                              {ev.company_name}
-                            </h4>
-                          </div>
-                        </div>
-
-                        <button
-                          onClick={() => navigate(`/ipo/${ev.slug}`)}
-                          className="text-xs font-medium text-slate-600 hover:text-slate-900 underline underline-offset-2 self-start sm:self-auto"
+                <div className="overflow-x-auto bg-white border border-[#EAEAEA] rounded-xl">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#FAFAFA] border-b border-[#EAEAEA] text-[#4B5563] font-semibold text-xs">
+                      <tr>
+                        <th className="py-3 px-4">Event Date</th>
+                        <th className="py-3 px-3">Company</th>
+                        <th className="py-3 px-3">Category</th>
+                        <th className="py-3 px-3">Milestone Event</th>
+                        <th className="py-3 px-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#EAEAEA] bg-white">
+                      {monthEvents.map((evt, idx) => (
+                        <tr
+                          key={`${evt.ipo_id}-${evt.event_type}-${idx}`}
+                          onClick={() => navigate(`/ipo/${evt.slug}`)}
+                          className="hover:bg-[#FAFAFA] transition-colors cursor-pointer group"
                         >
-                          View Offering
-                        </button>
-                      </div>
-                    );
-                  })}
+                          <td className="py-3.5 px-4 tabular-nums text-[#111827] whitespace-nowrap">
+                            {formatIndianDate(evt.event_date)}
+                          </td>
+                          <td className="py-3.5 px-3 font-medium text-[#111827]">
+                            {evt.company_name}
+                          </td>
+                          <td className="py-3.5 px-3 text-[#4B5563]">
+                            {evt.category}
+                          </td>
+                          <td className="py-3.5 px-3 whitespace-nowrap font-medium text-[#111827]">
+                            {evt.event_type}
+                          </td>
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/ipo/${evt.slug}`);
+                              }}
+                              className="px-3.5 py-1.5 bg-white border border-[#E5E7EB] hover:bg-[#FAFAFA] hover:border-[#111827] text-[#111827] text-sm font-medium rounded-lg transition-colors"
+                            >
+                              Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             ))
           )}
         </div>
-      )}
-
-      {/* Monthly Interactive View */}
-      {viewMode === 'month' && (
-        <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="text-base font-bold text-slate-900">
-                {currentDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
-              </h2>
+      ) : (
+        <div className="bg-white border border-[#EAEAEA] rounded-xl p-6 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EAEAEA]">
+            <h2 className="text-lg font-semibold text-[#111827]">
+              {currentDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' })}
+            </h2>
+            <div className="flex items-center gap-2">
               <button
                 onClick={currentMonthShortcut}
-                className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 px-2 py-0.5 rounded"
+                className="text-sm px-3 py-1.5 border border-[#E5E7EB] hover:bg-[#FAFAFA] text-[#111827] rounded-lg transition-colors font-medium"
               >
                 Today
               </button>
-            </div>
-
-            <div className="flex items-center gap-1">
               <button
                 onClick={prevMonth}
-                className="p-1.5 border border-slate-200 rounded hover:bg-slate-50 text-slate-600"
-                aria-label="Previous Month"
+                className="p-2 border border-[#E5E7EB] hover:bg-[#FAFAFA] rounded-lg text-[#4B5563]"
+                aria-label="Previous month"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={nextMonth}
-                className="p-1.5 border border-slate-200 rounded hover:bg-slate-50 text-slate-600"
-                aria-label="Next Month"
+                className="p-2 border border-[#E5E7EB] hover:bg-[#FAFAFA] rounded-lg text-[#4B5563]"
+                aria-label="Next month"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-slate-200 rounded overflow-hidden text-center text-xs">
+          <div className="grid grid-cols-7 gap-px bg-[#EAEAEA] border border-[#EAEAEA] rounded-xl overflow-hidden text-xs">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="bg-slate-50 py-2 font-semibold text-slate-600">
+              <div key={d} className="bg-[#FAFAFA] p-2.5 text-center font-semibold text-[#4B5563] text-xs">
                 {d}
               </div>
             ))}
+            {(() => {
+              const year = currentDate.getFullYear();
+              const month = currentDate.getMonth();
+              const firstDay = new Date(year, month, 1).getDay();
+              const totalDays = new Date(year, month + 1, 0).getDate();
+              const cells = [];
 
-            {/* Simple calendar days generator for current month */}
-            {Array.from({ length: 35 }).map((_, i) => {
-              const dayNum = i + 1;
-              const curMonthStr = `${currentDate.getFullYear()}-${String(
-                currentDate.getMonth() + 1
-              ).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-              const dayEvents = filteredEvents.filter((e) => e.event_date === curMonthStr);
+              for (let i = 0; i < firstDay; i++) {
+                cells.push(
+                  <div key={`empty-${i}`} className="bg-white min-h-[90px] p-2 opacity-30" />
+                );
+              }
 
-              return (
-                <div
-                  key={i}
-                  className="bg-white min-h-[90px] p-1.5 text-left flex flex-col justify-between"
-                >
-                  <span className="font-mono tabular-nums text-[11px] text-slate-400 font-medium">
-                    {dayNum <= 31 ? dayNum : ''}
-                  </span>
-                  <div className="space-y-1 mt-1 overflow-hidden">
-                    {dayEvents.map((ev, eIdx) => (
-                      <div
-                        key={eIdx}
-                        onClick={() => navigate(`/ipo/${ev.slug}`)}
-                        className="text-[10px] p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-medium truncate cursor-pointer"
-                        title={`${ev.event_type}: ${ev.company_name}`}
-                      >
-                        {ev.event_type.split(' ')[0]}: {ev.company_name.split(' ')[0]}
-                      </div>
-                    ))}
+              for (let day = 1; day <= totalDays; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayEvents = filteredEvents.filter((e) => e.event_date.startsWith(dateStr));
+                const isToday =
+                  new Date().toDateString() === new Date(year, month, day).toDateString();
+
+                cells.push(
+                  <div
+                    key={`day-${day}`}
+                    className={`bg-white min-h-[90px] p-2 space-y-1 hover:bg-[#FAFAFA] transition-colors ${
+                      isToday ? 'ring-1 ring-[#111827] ring-inset' : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-center text-xs">
+                      <span className={`tabular-nums ${isToday ? 'font-bold text-[#111827]' : 'text-[#4B5563]'}`}>
+                        {day}
+                      </span>
+                      {dayEvents.length > 0 && (
+                        <span className="text-xs text-[#111827] font-medium">
+                          {dayEvents.length}
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1 overflow-hidden">
+                      {dayEvents.slice(0, 2).map((evt, eIdx) => (
+                        <div
+                          key={eIdx}
+                          onClick={() => navigate(`/ipo/${evt.slug}`)}
+                          className="text-xs truncate bg-[#FAFAFA] border border-[#EAEAEA] text-[#111827] px-1.5 py-0.5 rounded cursor-pointer hover:border-[#111827]"
+                          title={`${evt.company_name} - ${evt.event_type}`}
+                        >
+                          {evt.company_name}
+                        </div>
+                      ))}
+                      {dayEvents.length > 2 && (
+                        <div className="text-xs text-[#4B5563] text-center">
+                          +{dayEvents.length - 2} more
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              }
+
+              return cells;
+            })()}
           </div>
         </div>
       )}

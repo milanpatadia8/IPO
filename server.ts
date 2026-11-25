@@ -13,14 +13,14 @@ const __dirname = path.dirname(__filename);
 const distServerPath = path.resolve(__dirname, 'dist', 'server.js');
 
 async function main() {
-  if (fs.existsSync(distServerPath)) {
-    // In production, execute the standalone bundled server
+  if (process.env.NODE_ENV === 'production' && fs.existsSync(distServerPath)) {
+    // In production container, execute the standalone bundled server
     const imported = await import(pathToFileURL(distServerPath).href);
     if (typeof imported.startServer === 'function') {
       await imported.startServer();
     }
   } else {
-    // In development mode (or pre-build execution), load from src/server-app
+    // In development mode, load from src/server-app with Vite dev middleware
     const { startServer } = await import('./src/server-app.ts');
     await startServer();
   }

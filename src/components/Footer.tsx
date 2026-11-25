@@ -1,187 +1,121 @@
 import React from 'react';
-import { Shield, AlertTriangle, ExternalLink, Database } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import { AdminUser } from '../types/ipo';
 
 interface FooterProps {
   navigate: (route: string) => void;
+  adminUser?: AdminUser | null;
+  onOpenAdminLogin: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ navigate }) => {
+export const Footer: React.FC<FooterProps> = ({
+  navigate,
+  adminUser,
+  onOpenAdminLogin,
+}) => {
   return (
-    <footer className="bg-white border-t border-slate-200 mt-16 text-slate-600 text-xs">
-      {/* Risk Notice Banner */}
-      <div className="bg-amber-50/60 border-b border-amber-200/50 py-3.5 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-start gap-3">
-          <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-          <p className="text-amber-900 leading-relaxed text-[11px] sm:text-xs">
-            <strong className="font-semibold text-amber-950">Statutory & Speculative Risk Warning:</strong> Grey Market Premium (GMP) is strictly unofficial, speculative, and based on unregulated dealer circle observations. It does not constitute an exchange-guaranteed transaction price or promise of listing gain. Investments in initial public offerings are subject to market risks; read all offer documents (DRHP/RHP) thoroughly before applying.
-          </p>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand Col */}
-          <div className="md:col-span-1 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded bg-slate-900 text-white flex items-center justify-center font-bold text-xs">
-                IPO
-              </div>
-              <span className="font-bold text-slate-900 text-sm">IPO Tracker India</span>
-            </div>
-            <p className="text-slate-500 leading-relaxed text-[12px]">
-              Independent intelligence dashboard monitoring Indian Mainboard and SME Initial Public Offerings across NSE and BSE.
+    <footer className="bg-white border-t border-[#EAEAEA] mt-20 text-[#4B5563] text-sm">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-8">
+          <div className="space-y-2.5 max-w-sm">
+            <div className="text-base font-semibold tracking-tight text-[#111827]">IPO Insiders</div>
+            <p className="text-sm text-[#4B5563] leading-relaxed">
+              Simple tracking for Mainboard and SME IPOs across NSE and BSE — open dates, live subscription multiples, GMP estimates, and one-click multi-PAN allotment checks.
             </p>
-            <div className="flex items-center gap-2 text-slate-400 text-[11px]">
-              <Database className="w-3.5 h-3.5 text-slate-400" />
-              <span>UTC / IST Standard Timestamps</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 text-sm">
+            <div className="space-y-2.5">
+              <div className="font-semibold text-[#111827]">Markets</div>
+              <ul className="space-y-2">
+                <li>
+                  <button onClick={() => navigate('/ipo/ongoing')} className="hover:text-[#111827] transition-colors">
+                    Open IPOs
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('/ipo/upcoming')} className="hover:text-[#111827] transition-colors">
+                    Upcoming IPOs
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('/ipo/gmp')} className="hover:text-[#111827] transition-colors">
+                    GMP Tracker
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('/ipo/listed')} className="hover:text-[#111827] transition-colors">
+                    Listed Performance
+                  </button>
+                </li>
+              </ul>
             </div>
-          </div>
 
-          {/* Quick Links */}
-          <div className="space-y-2.5">
-            <h4 className="font-semibold text-slate-900 text-xs tracking-wider uppercase">Market Desks</h4>
-            <ul className="space-y-2">
-              <li>
-                <button
-                  onClick={() => navigate('/ipo/ongoing')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  Ongoing Issues
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/ipo/upcoming')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  Upcoming IPOs
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/ipo/listed')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  Historical Listing Gains
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/ipo/gmp')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  Grey Market Premium (GMP)
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/calendar')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  IPO Event Calendar
-                </button>
-              </li>
-            </ul>
-          </div>
+            <div className="space-y-2.5">
+              <div className="font-semibold text-[#111827]">Tools</div>
+              <ul className="space-y-2">
+                <li>
+                  <button onClick={() => navigate('/calendar')} className="hover:text-[#111827] transition-colors">
+                    IPO Calendar
+                  </button>
+                </li>
+                <li>
+                  <a
+                    href="https://www.sebi.gov.in/filings/public-issues.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[#111827] transition-colors inline-flex items-center gap-1"
+                  >
+                    <span>SEBI Filings</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </li>
+                <li>
+                  <button
+                    onClick={() => (adminUser ? navigate('/admin') : onOpenAdminLogin())}
+                    className="hover:text-[#111827] transition-colors"
+                  >
+                    {adminUser ? 'Admin Console' : 'Admin Login'}
+                  </button>
+                </li>
+              </ul>
+            </div>
 
-          {/* Governance & Methodology */}
-          <div className="space-y-2.5">
-            <h4 className="font-semibold text-slate-900 text-xs tracking-wider uppercase">Data Architecture</h4>
-            <ul className="space-y-2">
-              <li>
-                <button
-                  onClick={() => navigate('/about')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  Data Methodology & Provenance
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/disclaimer')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  SEBI Risk Disclaimers
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/terms')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  Terms of Service
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/privacy')}
-                  className="hover:text-slate-900 transition-colors"
-                >
-                  Privacy Policy
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          {/* Official Registrars & Exchanges */}
-          <div className="space-y-2.5">
-            <h4 className="font-semibold text-slate-900 text-xs tracking-wider uppercase">Official Portals</h4>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="https://www.nseindia.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-slate-900 transition-colors"
-                >
-                  <span>National Stock Exchange (NSE)</span>
-                  <ExternalLink className="w-3 h-3 opacity-60" />
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://www.bseindia.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-slate-900 transition-colors"
-                >
-                  <span>Bombay Stock Exchange (BSE)</span>
-                  <ExternalLink className="w-3 h-3 opacity-60" />
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://www.sebi.gov.in/filings/public-issues.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-slate-900 transition-colors font-medium text-slate-700"
-                >
-                  <span>SEBI Public Issues (RHP & DRHP)</span>
-                  <ExternalLink className="w-3 h-3 opacity-60" />
-                </a>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/admin')}
-                  className="text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium pt-1"
-                >
-                  <span>Administrative Control Desk</span>
-                </button>
-              </li>
-            </ul>
+            <div className="space-y-2.5">
+              <div className="font-semibold text-[#111827]">Disclosures</div>
+              <ul className="space-y-2">
+                <li>
+                  <button onClick={() => navigate('/about')} className="hover:text-[#111827] transition-colors">
+                    Methodology
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('/disclaimer')} className="hover:text-[#111827] transition-colors">
+                    GMP Disclaimer
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('/terms')} className="hover:text-[#111827] transition-colors">
+                    Terms
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('/privacy')} className="hover:text-[#111827] transition-colors">
+                    Privacy
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-10 pt-6 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-400">
-          <div>
-            © {new Date().getFullYear()} IPO Tracker India. Built for Indian capital markets intelligence.
-          </div>
-          <div className="flex items-center gap-3">
-            <span>Development fixtures clearly labeled</span>
-            <span aria-hidden="true">·</span>
-            <span>All amounts in INR</span>
-          </div>
+        <div className="border-t border-[#F3F4F6] pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-[#6B7280]">
+          <p className="max-w-2xl leading-relaxed">
+            Grey Market Premium (GMP) figures are unofficial market observations and not exchange-guaranteed prices. Read the official Red Herring Prospectus (RHP) filed with SEBI before investing.
+          </p>
+          <span className="shrink-0">
+            © {new Date().getFullYear()} IPO Insiders
+          </span>
         </div>
       </div>
     </footer>

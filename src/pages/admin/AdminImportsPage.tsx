@@ -16,6 +16,7 @@ export const AdminImportsPage: React.FC<AdminImportsPageProps> = ({ adminUser })
   const [csvText, setCsvText] = useState(SAMPLE_CSV);
   const [isDryRun, setIsDryRun] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [importError, setImportError] = useState('');
   const [result, setResult] = useState<{
     totalRows: number;
     accepted: number;
@@ -27,11 +28,12 @@ export const AdminImportsPage: React.FC<AdminImportsPageProps> = ({ adminUser })
   const handleProcessImport = async () => {
     if (!csvText.trim()) return;
     setLoading(true);
+    setImportError('');
     try {
       const outcome = await api.adminImportCSV(csvText, adminUser, isDryRun);
       setResult(outcome);
     } catch (err: unknown) {
-      alert(`Import error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setImportError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -46,6 +48,13 @@ export const AdminImportsPage: React.FC<AdminImportsPageProps> = ({ adminUser })
           Upload and validate historical IPO records, price determinations, and syndicate details with automatic schema verification.
         </p>
       </div>
+
+      {importError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          <span>Import error: {importError}</span>
+        </div>
+      )}
 
       {/* Schema Requirement Card */}
       <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-3 text-xs">

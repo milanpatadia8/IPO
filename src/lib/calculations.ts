@@ -205,3 +205,84 @@ export function getValidDocUrl(url?: string | null): string {
   return clean;
 }
 
+/**
+ * Returns descriptive demand metadata for IPO Premium Fire Rating (1-5 flames)
+ */
+export function getFireRatingInfo(rating?: number): {
+  flames: string;
+  label: string;
+  badgeClass: string;
+  numericRating: number;
+} {
+  const r = rating && rating >= 1 && rating <= 5 ? Math.round(rating) : 3;
+  switch (r) {
+    case 5:
+      return {
+        flames: '🔥🔥🔥🔥🔥',
+        label: 'Super Hot / High Demand',
+        badgeClass: 'bg-rose-50 text-rose-800 border-rose-200',
+        numericRating: 5,
+      };
+    case 4:
+      return {
+        flames: '🔥🔥🔥🔥',
+        label: 'Strong Interest',
+        badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+        numericRating: 4,
+      };
+    case 3:
+      return {
+        flames: '🔥🔥🔥',
+        label: 'Moderate Demand',
+        badgeClass: 'bg-blue-50 text-blue-800 border-blue-200',
+        numericRating: 3,
+      };
+    case 2:
+      return {
+        flames: '🔥🔥',
+        label: 'Average / Neutral',
+        badgeClass: 'bg-neutral-50 text-neutral-700 border-neutral-200',
+        numericRating: 2,
+      };
+    case 1:
+    default:
+      return {
+        flames: '🔥',
+        label: 'Low / Discount Caution',
+        badgeClass: 'bg-slate-50 text-slate-700 border-slate-200',
+        numericRating: 1,
+      };
+  }
+}
+
+/**
+ * Calculates estimated profit and total return based on number of lots and GMP.
+ */
+export function calculateIPOProfit(
+  lotSize: number,
+  lotsCount: number,
+  pricePerShare: number,
+  gmpAmount: number
+): {
+  totalShares: number;
+  totalInvestment: number;
+  estimatedProfit: number;
+  totalEstimatedValue: number;
+  roiPercentage: number;
+} {
+  const shares = Math.max(1, lotSize) * Math.max(1, lotsCount);
+  const investment = shares * Math.max(1, pricePerShare);
+  const profit = shares * (gmpAmount || 0);
+  const totalValue = investment + profit;
+  const roi = investment > 0 ? (profit / investment) * 100 : 0;
+
+  return {
+    totalShares: shares,
+    totalInvestment: Math.round(investment),
+    estimatedProfit: Math.round(profit),
+    totalEstimatedValue: Math.round(totalValue),
+    roiPercentage: Number(roi.toFixed(2)),
+  };
+}
+
+

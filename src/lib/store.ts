@@ -2185,6 +2185,23 @@ const INITIAL_GMP_SNAPSHOTS: GMPSnapshot[] = [
 
 // Initial Subscriptions
 const INITIAL_SUBSCRIPTIONS: SubscriptionSnapshot[] = [
+  // Jio Platforms Limited (Day 1 - Reliance Jio)
+  {
+    id: '77777777-7777-7777-7777-777777770019',
+    ipo_id: '44444444-4444-4444-4444-444444440020',
+    retail_multiple: 0.62,
+    nii_multiple: 1.84,
+    qib_multiple: 0.45,
+    employee_multiple: 0.95,
+    shareholder_multiple: 0.0,
+    total_multiple: 0.88,
+    unit: 'times',
+    day_number: 1,
+    observed_at: new Date(Date.now() - 25 * 3600 * 1000).toISOString(),
+    ingested_at: new Date(Date.now() - 25 * 3600 * 1000).toISOString(),
+    verification_status: 'verified',
+    created_at: new Date(Date.now() - 25 * 3600 * 1000).toISOString(),
+  },
   // Jio Platforms Limited (Day 2 LIVE NOW - Reliance Jio)
   {
     id: '77777777-7777-7777-7777-777777770020',
@@ -2201,6 +2218,23 @@ const INITIAL_SUBSCRIPTIONS: SubscriptionSnapshot[] = [
     ingested_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
     verification_status: 'verified',
     created_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
+  },
+  // Paras Healthcare Limited (Day 1)
+  {
+    id: '77777777-7777-7777-7777-777777770027',
+    ipo_id: '44444444-4444-4444-4444-444444440021',
+    retail_multiple: 1.15,
+    nii_multiple: 1.45,
+    qib_multiple: 0.28,
+    employee_multiple: 0.50,
+    shareholder_multiple: 0.0,
+    total_multiple: 0.95,
+    unit: 'times',
+    day_number: 1,
+    observed_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
+    ingested_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
+    verification_status: 'verified',
+    created_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
   },
   // Paras Healthcare Limited (Day 2 LIVE NOW)
   {
@@ -2440,6 +2474,88 @@ const INITIAL_SUBSCRIPTIONS: SubscriptionSnapshot[] = [
     verification_status: 'verified',
     created_at: '2024-11-22T17:10:00Z',
   },
+  // Historical Premier Energies Progression
+  {
+    id: '77777777-7777-7777-7777-777777770041',
+    ipo_id: '44444444-4444-4444-4444-444444440003',
+    retail_multiple: 1.90,
+    nii_multiple: 5.30,
+    qib_multiple: 0.15,
+    employee_multiple: 2.10,
+    shareholder_multiple: 0.0,
+    total_multiple: 2.16,
+    unit: 'times',
+    day_number: 1,
+    observed_at: '2024-08-27T17:00:00Z',
+    ingested_at: '2024-08-27T17:05:00Z',
+    verification_status: 'verified',
+    created_at: '2024-08-27T17:05:00Z',
+  },
+  {
+    id: '77777777-7777-7777-7777-777777770042',
+    ipo_id: '44444444-4444-4444-4444-444444440003',
+    retail_multiple: 4.15,
+    nii_multiple: 19.80,
+    qib_multiple: 1.42,
+    employee_multiple: 5.20,
+    shareholder_multiple: 0.0,
+    total_multiple: 6.61,
+    unit: 'times',
+    day_number: 2,
+    observed_at: '2024-08-28T17:00:00Z',
+    ingested_at: '2024-08-28T17:05:00Z',
+    verification_status: 'verified',
+    created_at: '2024-08-28T17:05:00Z',
+  },
+  {
+    id: '77777777-7777-7777-7777-777777770043',
+    ipo_id: '44444444-4444-4444-4444-444444440003',
+    retail_multiple: 7.69,
+    nii_multiple: 50.04,
+    qib_multiple: 216.40,
+    employee_multiple: 11.45,
+    shareholder_multiple: 0.0,
+    total_multiple: 74.38,
+    unit: 'times',
+    day_number: 3,
+    observed_at: '2024-08-29T17:00:00Z',
+    ingested_at: '2024-08-29T17:05:00Z',
+    verification_status: 'verified',
+    created_at: '2024-08-29T17:05:00Z',
+  },
+  // Historical Waaree Day 1 & Day 2
+  {
+    id: '77777777-7777-7777-7777-777777770044',
+    ipo_id: '44444444-4444-4444-4444-444444440001',
+    retail_multiple: 3.17,
+    nii_multiple: 8.04,
+    qib_multiple: 0.08,
+    employee_multiple: 1.54,
+    shareholder_multiple: 0.0,
+    total_multiple: 3.32,
+    unit: 'times',
+    day_number: 1,
+    observed_at: '2024-10-21T17:00:00Z',
+    ingested_at: '2024-10-21T17:05:00Z',
+    verification_status: 'verified',
+    created_at: '2024-10-21T17:05:00Z',
+  },
+  {
+    id: '77777777-7777-7777-7777-777777770045',
+    ipo_id: '44444444-4444-4444-4444-444444440001',
+    retail_multiple: 6.38,
+    nii_multiple: 24.32,
+    qib_multiple: 1.72,
+    employee_multiple: 3.10,
+    shareholder_multiple: 0.0,
+    total_multiple: 8.98,
+    unit: 'times',
+    day_number: 2,
+    observed_at: '2024-10-22T17:00:00Z',
+    ingested_at: '2024-10-22T17:05:00Z',
+    verification_status: 'verified',
+    created_at: '2024-10-22T17:05:00Z',
+  },
   // Historical Waaree Final
   {
     id: '77777777-7777-7777-7777-777777770004',
@@ -2456,6 +2572,39 @@ const INITIAL_SUBSCRIPTIONS: SubscriptionSnapshot[] = [
     ingested_at: '2024-10-23T17:05:00Z',
     verification_status: 'verified',
     created_at: '2024-10-23T17:05:00Z',
+  },
+  // Historical Swiggy Day 1 & Day 2
+  {
+    id: '77777777-7777-7777-7777-777777770046',
+    ipo_id: '44444444-4444-4444-4444-444444440005',
+    retail_multiple: 0.54,
+    nii_multiple: 0.14,
+    qib_multiple: 0.08,
+    employee_multiple: 0.74,
+    shareholder_multiple: 0.0,
+    total_multiple: 0.35,
+    unit: 'times',
+    day_number: 1,
+    observed_at: '2024-11-06T17:00:00Z',
+    ingested_at: '2024-11-06T17:05:00Z',
+    verification_status: 'verified',
+    created_at: '2024-11-06T17:05:00Z',
+  },
+  {
+    id: '77777777-7777-7777-7777-777777770047',
+    ipo_id: '44444444-4444-4444-4444-444444440005',
+    retail_multiple: 0.84,
+    nii_multiple: 0.25,
+    qib_multiple: 0.28,
+    employee_multiple: 1.15,
+    shareholder_multiple: 0.0,
+    total_multiple: 0.56,
+    unit: 'times',
+    day_number: 2,
+    observed_at: '2024-11-07T17:00:00Z',
+    ingested_at: '2024-11-07T17:05:00Z',
+    verification_status: 'verified',
+    created_at: '2024-11-07T17:05:00Z',
   },
   // Historical Swiggy Final
   {
@@ -2910,18 +3059,53 @@ class IPODataStore {
 
   public updateIPO(
     id: string,
-    updates: Partial<IPO>,
+    updates: Partial<IPO> & {
+      companyName?: string;
+      description?: string;
+      industry?: string;
+    },
     actor: { id: string; name: string }
   ): IPO | undefined {
     const existing = this.ipos.get(id);
     if (!existing) return undefined;
 
-    const before = { ...existing };
-    const updated = {
+    const before = this.hydrateIPO(existing);
+
+    // Update linked company fields if provided
+    const { companyName, description, industry, ...ipoUpdates } = updates;
+    const existingCompany = this.companies.get(existing.company_id);
+    if (
+      existingCompany &&
+      (companyName !== undefined || description !== undefined || industry !== undefined)
+    ) {
+      const updatedCompany: Company = {
+        ...existingCompany,
+        name: companyName !== undefined && companyName.trim() ? companyName.trim() : existingCompany.name,
+        description: description !== undefined ? description : existingCompany.description,
+        industry: industry !== undefined ? industry : existingCompany.industry,
+        updated_at: new Date().toISOString(),
+      };
+      this.companies.set(existing.company_id, updatedCompany);
+    }
+
+    // Normalize null values from JSON payloads back to undefined for optional fields
+    const normalizedUpdates: Partial<IPO> = {};
+    for (const [key, val] of Object.entries(ipoUpdates)) {
+      if (key === 'id' || key === 'company_id' || key === 'created_at') continue;
+      (normalizedUpdates as Record<string, unknown>)[key] = val === null || val === '' ? undefined : val;
+    }
+
+    const updated: IPO = {
       ...existing,
-      ...updates,
-      drhp_url: updates.drhp_url !== undefined ? getValidDocUrl(updates.drhp_url) : existing.drhp_url,
-      rhp_url: updates.rhp_url !== undefined ? getValidDocUrl(updates.rhp_url) : existing.rhp_url,
+      ...normalizedUpdates,
+      drhp_url:
+        normalizedUpdates.drhp_url !== undefined
+          ? getValidDocUrl(normalizedUpdates.drhp_url)
+          : existing.drhp_url,
+      rhp_url:
+        normalizedUpdates.rhp_url !== undefined
+          ? getValidDocUrl(normalizedUpdates.rhp_url)
+          : existing.rhp_url,
       updated_at: new Date().toISOString(),
     };
     this.ipos.set(id, updated);
@@ -2932,8 +3116,15 @@ class IPODataStore {
       action: 'IPO_UPDATE',
       entity_type: 'ipo',
       entity_id: id,
-      before_values: before as unknown as Record<string, unknown>,
-      after_values: updates as unknown as Record<string, unknown>,
+      before_values: {
+        slug: before.slug,
+        company: before.company?.name,
+        status: before.status,
+      },
+      after_values: {
+        ...(companyName !== undefined ? { companyName } : {}),
+        ...normalizedUpdates,
+      } as unknown as Record<string, unknown>,
     });
 
     return this.hydrateIPO(updated);
@@ -2943,7 +3134,11 @@ class IPODataStore {
     const existing = this.ipos.get(id);
     if (!existing) return false;
 
+    const company = this.companies.get(existing.company_id);
     this.ipos.delete(id);
+    this.listingResults.delete(id);
+    this.gmpSnapshots = this.gmpSnapshots.filter((g) => g.ipo_id !== id);
+    this.subscriptionSnapshots = this.subscriptionSnapshots.filter((s) => s.ipo_id !== id);
 
     this.logAudit({
       actor_id: actor.id,
@@ -2951,7 +3146,7 @@ class IPODataStore {
       action: 'IPO_DELETE',
       entity_type: 'ipo',
       entity_id: id,
-      before_values: { slug: existing.slug },
+      before_values: { slug: existing.slug, company: company?.name },
       after_values: null,
     });
 

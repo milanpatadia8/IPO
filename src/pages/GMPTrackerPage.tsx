@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { GMPDisplay } from '../components/GMPDisplay';
 import { GMPTrendChart } from '../components/GMPTrendChart';
 import { AllotmentCheckerModal } from '../components/AllotmentCheckerModal';
+import { IPOProfitCalculator } from '../components/IPOProfitCalculator';
 import {
   formatINR,
   calculateIndicativeListingPrice,
@@ -13,14 +14,11 @@ import {
   formatIndianDate,
 } from '../lib/calculations';
 import {
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
+  AlertCircle,
   Clock,
   ExternalLink,
   ChevronRight,
   Info,
-  ShieldAlert,
   Search,
   Flame,
   CheckCircle2,
@@ -49,7 +47,6 @@ export const GMPTrackerPage: React.FC<GMPTrackerPageProps> = ({ navigate }) => {
         const withGmp = all.filter((i) => i.latest_gmp);
         setIPOs(withGmp);
         if (withGmp.length > 0) {
-          // Default select Jio Platforms or first ongoing IPO
           const jio = withGmp.find((i) => i.slug === 'jio-platforms-ipo');
           const ongoing = withGmp.find((i) => i.status === 'ongoing');
           setSelectedIpo(jio || ongoing || withGmp[0]);
@@ -64,106 +61,90 @@ export const GMPTrackerPage: React.FC<GMPTrackerPageProps> = ({ navigate }) => {
   }, []);
 
   const filtered = ipos.filter((ipo) => {
-    // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const name = ipo.company?.name?.toLowerCase() || '';
       const slug = ipo.slug.toLowerCase();
       if (!name.includes(q) && !slug.includes(q)) return false;
     }
-
-    // Filter Type
     if (filterType === 'Mainboard') return ipo.category === 'Mainboard';
     if (filterType === 'SME') return ipo.category === 'SME';
     if (filterType === 'live') return ipo.status === 'ongoing';
-    if (filterType === 'hot') {
-      const fire = ipo.latest_gmp?.fire_rating || 0;
-      return fire >= 4;
-    }
+    if (filterType === 'hot') return (ipo.latest_gmp?.fire_rating || 0) >= 4;
     return true;
   });
 
-  const handleOpenAllotment = (slug?: string) => {
+  const handleOpenAllotment = (slug: string) => {
     setAllotmentModalSlug(slug);
     setAllotmentModalOpen(true);
   };
 
+  const getDemandLabel = (rating?: number) => {
+    if (!rating) return '—';
+    if (rating >= 5) return 'Super Hot';
+    if (rating === 4) return 'Strong';
+    if (rating === 3) return 'Moderate';
+    if (rating === 2) return 'Mild';
+    return 'Subdued';
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
-              IPO Premium Real-Time Tracker
-            </span>
-            <span className="text-xs text-slate-500 font-medium">Oct 2026 Live Market</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            IPO GMP Today Live, Kostak & Subject to Sauda
-          </h1>
-          <p className="text-sm text-slate-600 max-w-3xl">
-            Live dealer quotations, Kostak rates, Subject to Sauda (SS), and indicative listing gain percentages for active Mainboard and SME public offerings.
-          </p>
-        </div>
-
-        {/* Action Button: Auto Allotment Checker */}
-        <div className="shrink-0">
-          <button
-            onClick={() => handleOpenAllotment()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Check Allotment Status</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Statutory Speculative Risk Warning (Section 9) */}
-      <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-4 text-xs text-amber-900 space-y-1.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 font-bold text-amber-950 text-sm">
-            <ShieldAlert className="w-4 h-4 text-amber-700" />
-            <span>Grey Market Premium (GMP) & Kostak Statutory Notice</span>
-          </div>
-          <button
-            onClick={() => setShowExplainer(!showExplainer)}
-            className="text-[11px] font-semibold text-amber-900 underline hover:text-amber-950 flex items-center gap-1"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>{showExplainer ? 'Hide Guide' : 'What is Kostak & Sauda?'}</span>
-          </button>
-        </div>
-        <p className="leading-relaxed text-[11px] sm:text-xs">
-          Grey Market Premium (GMP), Kostak, and Subject to Sauda (SS) are strictly unofficial, unregulated over-the-counter estimations in dealer circles. They do not constitute an exchange-guaranteed listing price. Indicative prices are arithmetic projections (<code className="font-mono bg-amber-100/70 px-1 py-0.5 rounded">Issue Price + GMP</code>).
+      <div className="space-y-2 border-b border-[#EAEAEA] pb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-[#111827] tracking-tight">
+          Live Grey Market Premium (GMP)
+        </h1>
+        <p className="text-base text-[#4B5563] max-w-2xl leading-relaxed">
+          Consolidated unofficial dealer quotations, Kostak rates, Subject to Sauda (SS), and indicative listing price estimates.
         </p>
       </div>
 
-      {/* Explainer Accordion: Kostak vs Subject to Sauda */}
+      {/* Statutory Notice */}
+      <div className="bg-white border border-[#EAEAEA] rounded-xl p-5 text-sm text-[#4B5563] space-y-2">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 font-medium text-[#111827]">
+            <AlertCircle className="w-4 h-4 text-[#6B7280] shrink-0" />
+            <span>Grey Market Premium &amp; Kostak Notice</span>
+          </div>
+          <button
+            onClick={() => setShowExplainer(!showExplainer)}
+            className="text-sm font-medium text-[#111827] hover:underline flex items-center gap-1 shrink-0"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>{showExplainer ? 'Hide Guide' : 'What is Kostak & Sauda?'}</span>
+          </button>
+        </div>
+        <p className="leading-relaxed text-sm text-[#4B5563]">
+          GMP, Kostak, and Subject to Sauda (SS) are unofficial over-the-counter estimates and do not constitute an exchange-guaranteed listing price. Indicative prices are arithmetic projections (Issue Price + GMP).
+        </p>
+      </div>
+
+      {/* Explainer Accordion */}
       {showExplainer && (
-        <div className="bg-white border border-slate-200 rounded-lg p-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs animate-in fade-in duration-200">
-          <div className="p-3 bg-slate-50 rounded border border-slate-100 space-y-1">
-            <span className="font-bold text-slate-900 block flex items-center gap-1">
-              <span>📈 Grey Market Premium (GMP)</span>
+        <div className="bg-white border border-[#EAEAEA] rounded-xl p-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="p-4 bg-[#FAFAFA] rounded-lg border border-[#EAEAEA] space-y-1.5">
+            <span className="font-semibold text-[#111827] block">
+              Grey Market Premium (GMP)
             </span>
-            <p className="text-slate-600 leading-relaxed text-[11px]">
-              The extra premium per share at which an IPO is traded in unofficial dealer circles before exchange listing. A GMP of ₹246 on a ₹1,119 issue signals an estimated debut at ~₹1,365 (+22.0%).
+            <p className="text-[#4B5563] leading-relaxed text-sm">
+              The premium per share at which an IPO is traded in unofficial circles before listing. A GMP of ₹246 on a ₹1,119 issue signals an estimated debut near ₹1,365 (+22.0%).
             </p>
           </div>
-          <div className="p-3 bg-amber-50/60 rounded border border-amber-100 space-y-1">
-            <span className="font-bold text-amber-950 block flex items-center gap-1">
-              <span>📝 Kostak Rate</span>
+          <div className="p-4 bg-[#FAFAFA] rounded-lg border border-[#EAEAEA] space-y-1.5">
+            <span className="font-semibold text-[#111827] block">
+              Kostak Rate
             </span>
-            <p className="text-amber-900 leading-relaxed text-[11px]">
-              Fixed upfront cash paid to an IPO applicant for their complete retail application, irrespective of whether shares are allotted. You keep the Kostak profit even if allotment is zero.
+            <p className="text-[#4B5563] leading-relaxed text-sm">
+              Fixed cash paid to an applicant for their application, irrespective of whether shares are allotted. You keep the Kostak profit even without allotment.
             </p>
           </div>
-          <div className="p-3 bg-indigo-50/60 rounded border border-indigo-100 space-y-1">
-            <span className="font-bold text-indigo-950 block flex items-center gap-1">
-              <span>🤝 Subject to Sauda (SS / STS)</span>
+          <div className="p-4 bg-[#FAFAFA] rounded-lg border border-[#EAEAEA] space-y-1.5">
+            <span className="font-semibold text-[#111827] block">
+              Subject to Sauda (SS)
             </span>
-            <p className="text-indigo-900 leading-relaxed text-[11px]">
-              A contingent transaction where the buyer only pays the agreed premium if the applicant actually receives share allotment. If no allotment occurs, the deal is automatically void.
+            <p className="text-[#4B5563] leading-relaxed text-sm">
+              A contingent deal where the buyer pays the agreed premium only if shares are allotted. If no allotment occurs, the deal is void.
             </p>
           </div>
         </div>
@@ -171,35 +152,33 @@ export const GMPTrackerPage: React.FC<GMPTrackerPageProps> = ({ navigate }) => {
 
       {/* Selected IPO Historical Trend Highlight */}
       {selectedIpo && (
-        <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4 shadow-2xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="bg-white border border-[#EAEAEA] rounded-xl p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#EAEAEA] pb-4">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Historical GMP Trajectory
-                </span>
+              <div className="flex items-center gap-2 text-xs text-[#4B5563]">
+                <span className="font-medium">Historical GMP Trajectory</span>
                 {selectedIpo.status === 'ongoing' && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
-                    LIVE BIDDING
-                  </span>
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="font-medium text-[#16A34A]">Live Bidding</span>
+                  </>
                 )}
               </div>
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-xl font-semibold text-[#111827] mt-0.5">
                 {selectedIpo.company?.name || selectedIpo.slug}
               </h2>
-              <div className="text-xs text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
+              <div className="text-sm text-[#4B5563] flex flex-wrap items-center gap-2 mt-1">
                 <span>{selectedIpo.category}</span>
                 <span aria-hidden="true">·</span>
-                <span>Closes: {formatIndianDate(selectedIpo.close_date)}</span>
+                <span>Closes {formatIndianDate(selectedIpo.close_date)}</span>
                 <span aria-hidden="true">·</span>
-                <span className="font-mono tabular-nums">
-                  Price Band: ₹{selectedIpo.price_band_min || selectedIpo.issue_price} - ₹
-                  {selectedIpo.price_band_max || selectedIpo.issue_price}
+                <span className="tabular-nums">
+                  ₹{selectedIpo.price_band_min || selectedIpo.issue_price} – ₹{selectedIpo.price_band_max || selectedIpo.issue_price}
                 </span>
                 {selectedIpo.lot_size && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span>Lot: {selectedIpo.lot_size} Shares</span>
+                    <span className="tabular-nums">{selectedIpo.lot_size} shares/lot</span>
                   </>
                 )}
               </div>
@@ -208,15 +187,15 @@ export const GMPTrackerPage: React.FC<GMPTrackerPageProps> = ({ navigate }) => {
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <button
                 onClick={() => handleOpenAllotment(selectedIpo.slug)}
-                className="text-xs font-semibold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded transition-colors"
+                className="text-sm font-medium text-[#111827] bg-white hover:bg-[#FAFAFA] border border-[#E5E7EB] px-3.5 py-2 rounded-lg transition-colors"
               >
                 Check Allotment
               </button>
               <button
                 onClick={() => navigate(`/ipo/${selectedIpo.slug}`)}
-                className="text-xs font-semibold text-slate-900 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded transition-colors"
+                className="text-sm font-medium text-white bg-[#111827] hover:bg-neutral-800 px-4 py-2 rounded-lg transition-colors"
               >
-                Full Prospectus →
+                Full Details
               </button>
             </div>
           </div>
@@ -228,264 +207,214 @@ export const GMPTrackerPage: React.FC<GMPTrackerPageProps> = ({ navigate }) => {
         </div>
       )}
 
-      {/* Filter and Search Bar Controls (ipopremium.in convention) */}
+      {/* Interactive IPO Profit & Return Estimator */}
+      <IPOProfitCalculator ipos={ipos} preselectedSlug={selectedIpo?.slug} />
+
+      {/* Filter and Search Bar Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
+        <div className="flex flex-wrap items-center gap-1 p-1 bg-white border border-[#EAEAEA] rounded-lg">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
               filterType === 'all'
-                ? 'bg-white font-bold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
-            All Active GMP
+            All Active
           </button>
           <button
             onClick={() => setFilterType('live')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
               filterType === 'live'
-                ? 'bg-white font-bold text-rose-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
-            Live Bidding ({ipos.filter((i) => i.status === 'ongoing').length})
+            Open ({ipos.filter((i) => i.status === 'ongoing').length})
           </button>
           <button
             onClick={() => setFilterType('Mainboard')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
               filterType === 'Mainboard'
-                ? 'bg-white font-bold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
             Mainboard
           </button>
           <button
             onClick={() => setFilterType('SME')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
               filterType === 'SME'
-                ? 'bg-white font-bold text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
-            SME Emerge
+            SME
           </button>
           <button
             onClick={() => setFilterType('hot')}
-            className={`px-3 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap flex items-center gap-1 ${
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors whitespace-nowrap ${
               filterType === 'hot'
-                ? 'bg-white font-bold text-amber-700 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 font-medium'
+                ? 'bg-[#111827] text-white font-medium'
+                : 'text-[#4B5563] hover:text-[#111827]'
             }`}
           >
-            <Flame className="w-3.5 h-3.5 text-amber-600" />
-            <span>High Fire (🔥 4+)</span>
+            High Demand
           </button>
         </div>
 
         {/* Live Search Input */}
         <div className="relative min-w-[240px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-[#6B7280] absolute left-3 top-3" />
           <input
             type="text"
-            placeholder="Search IPO name (e.g. Jio, Tonbo)..."
+            placeholder="Filter IPO name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full text-sm pl-9 pr-3 py-2 bg-white border border-[#EAEAEA] focus:border-[#111827] rounded-lg text-[#111827] outline-none"
           />
         </div>
       </div>
 
-      {/* IPO Premium Live GMP Comprehensive Table */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900 text-white font-semibold text-[11px] tracking-wider uppercase">
+      {/* Clean GMP Table */}
+      <div className="overflow-x-auto bg-white border border-[#EAEAEA] rounded-xl">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-[#FAFAFA] border-b border-[#EAEAEA] text-[#4B5563] font-semibold text-xs">
+            <tr>
+              <th className="py-3.5 px-4">Company</th>
+              <th className="py-3.5 px-3">Open Date</th>
+              <th className="py-3.5 px-3 text-right">Issue Price</th>
+              <th className="py-3.5 px-3 text-right">GMP (₹)</th>
+              <th className="py-3.5 px-3 text-right">Kostak</th>
+              <th className="py-3.5 px-3 text-right">Sauda</th>
+              <th className="py-3.5 px-3">Demand</th>
+              <th className="py-3.5 px-3 text-right">Est. Listing</th>
+              <th className="py-3.5 px-3 text-right">Est. Gain</th>
+              <th className="py-3.5 px-3 text-right">Sub</th>
+              <th className="py-3.5 px-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#EAEAEA] tabular-nums bg-white">
+            {loading ? (
               <tr>
-                <th className="py-3 px-4">IPO Company</th>
-                <th className="py-3 px-3 text-center">Dates & Lot</th>
-                <th className="py-3 px-3 text-right">Price Band</th>
-                <th className="py-3 px-3 text-right">GMP (₹)</th>
-                <th className="py-3 px-3 text-right">Kostak (₹)</th>
-                <th className="py-3 px-3 text-right">Sauda (SS)</th>
-                <th className="py-3 px-2 text-center">Fire</th>
-                <th className="py-3 px-3 text-right">Est. Listing Price</th>
-                <th className="py-3 px-3 text-right">Est. Gain (%)</th>
-                <th className="py-3 px-3 text-center">Live Sub</th>
-                <th className="py-3 px-3 text-center">Action</th>
+                <td colSpan={11} className="py-12 text-center text-[#4B5563]">
+                  Loading grey market observations...
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400 font-sans">
-                    No active IPO GMP quotes matching your current search or category filter.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((ipo) => {
-                  const gmp = ipo.latest_gmp;
-                  if (!gmp) return null;
-                  const basePrice = ipo.issue_price || ipo.price_band_max;
-                  const { price: estPrice } = calculateIndicativeListingPrice(
-                    basePrice,
-                    gmp.gmp_amount
-                  );
-                  const gainPct = calculateIndicativeGainPercentage(basePrice, gmp.gmp_amount);
-                  const isSelected = selectedIpo?.id === ipo.id;
-                  const isLive = ipo.status === 'ongoing';
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={11} className="py-12 text-center text-[#4B5563]">
+                  No active IPO GMP quotes match your filter.
+                </td>
+              </tr>
+            ) : (
+              filtered.map((ipo) => {
+                const gmp = ipo.latest_gmp;
+                if (!gmp) return null;
+                const basePrice = ipo.issue_price || ipo.price_band_max;
+                const indEst = basePrice ? calculateIndicativeListingPrice(basePrice, gmp.gmp_amount) : null;
+                const indGainPct = basePrice ? calculateIndicativeGainPercentage(basePrice, gmp.gmp_amount) : null;
+                const isSelected = selectedIpo?.id === ipo.id;
+                const isGain = gmp.gmp_amount >= 0;
 
-                  return (
-                    <tr
-                      key={ipo.id}
-                      onClick={() => setSelectedIpo(ipo)}
-                      className={`hover:bg-slate-50 cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-50/60 font-medium' : ''
-                      }`}
-                    >
-                      {/* Company Name & Badges */}
-                      <td className="py-3.5 px-4 font-sans">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-slate-900 hover:text-blue-600 transition-colors">
-                              {ipo.company?.name || ipo.slug}
-                            </span>
-                            {isLive && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-700 animate-pulse">
-                                LIVE
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-medium">
-                              {ipo.category}
-                            </span>
-                            <span>{ipo.exchange}</span>
-                          </div>
-                        </div>
-                      </td>
+                return (
+                  <tr
+                    key={ipo.id}
+                    onClick={() => setSelectedIpo(ipo)}
+                    className={`hover:bg-[#FAFAFA] transition-colors cursor-pointer group ${
+                      isSelected ? 'bg-[#FAFAFA]' : ''
+                    }`}
+                  >
+                    <td className="py-4 px-4">
+                      <div className="font-semibold text-[#111827] text-sm sm:text-[15px]">
+                        {ipo.company?.name || ipo.slug}
+                      </div>
+                      <div className="text-xs text-[#4B5563] flex items-center gap-1.5 mt-0.5">
+                        <span>{ipo.category}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{ipo.exchange}</span>
+                        {ipo.status === 'ongoing' && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span className="text-[#16A34A] font-medium">Open</span>
+                          </>
+                        )}
+                      </div>
+                    </td>
 
-                      {/* Dates & Lot */}
-                      <td className="py-3.5 px-3 text-center font-sans text-[11px] text-slate-600">
+                    <td className="py-4 px-3 whitespace-nowrap text-sm text-[#4B5563]">
+                      {ipo.open_date ? (
                         <div>
-                          {ipo.open_date && ipo.close_date ? (
-                            <span>
-                              {formatIndianDate(ipo.open_date).split(',')[0]} -{' '}
-                              {formatIndianDate(ipo.close_date).split(',')[0]}
-                            </span>
-                          ) : (
-                            'Dates TBA'
-                          )}
+                          <span>{formatIndianDate(ipo.open_date)}</span>
+                          <span className="block text-xs text-[#6B7280]">{ipo.lot_size ? `${ipo.lot_size} sh` : ''}</span>
                         </div>
-                        <span className="text-slate-400 font-mono text-[10px]">
-                          Lot: {ipo.lot_size ? `${ipo.lot_size} sh` : 'TBA'}
+                      ) : (
+                        <span className="text-[#6B7280]">TBA</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-3 text-right text-[#111827]">
+                      ₹{ipo.price_band_max || ipo.issue_price || '-'}
+                    </td>
+
+                    <td className={`py-4 px-3 text-right font-semibold whitespace-nowrap ${isGain ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                      {isGain ? `+₹${gmp.gmp_amount}` : `-₹${Math.abs(gmp.gmp_amount)}`}
+                    </td>
+
+                    <td className="py-4 px-3 text-right text-[#4B5563]">
+                      {gmp.kostak_rate ? `₹${gmp.kostak_rate.toLocaleString('en-IN')}` : '—'}
+                    </td>
+
+                    <td className="py-4 px-3 text-right text-[#4B5563]">
+                      {gmp.subject_to_sauda_rate ? `₹${gmp.subject_to_sauda_rate.toLocaleString('en-IN')}` : '—'}
+                    </td>
+
+                    <td className="py-4 px-3 text-sm">
+                      <span className={`font-medium ${(gmp.fire_rating || 0) >= 4 ? 'text-[#16A34A]' : 'text-[#4B5563]'}`}>
+                        {getDemandLabel(gmp.fire_rating)}
+                      </span>
+                    </td>
+
+                    <td className="py-4 px-3 text-right font-medium text-[#111827]">
+                      {indEst ? `₹${indEst.price}` : '—'}
+                    </td>
+
+                    <td className={`py-4 px-3 text-right font-semibold ${(indGainPct ?? 0) >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
+                      {indGainPct !== null ? `${indGainPct >= 0 ? '+' : ''}${indGainPct}%` : '—'}
+                    </td>
+
+                    <td className="py-4 px-3 text-right text-sm">
+                      {ipo.latest_subscription ? (
+                        <span className="font-medium text-[#111827]">
+                          {ipo.latest_subscription.total_multiple.toFixed(2)}x
                         </span>
-                      </td>
+                      ) : (
+                        <span className="text-[#6B7280]">—</span>
+                      )}
+                    </td>
 
-                      {/* Price Band */}
-                      <td className="py-3.5 px-3 text-right text-slate-900 font-semibold">
-                        {ipo.price_band_min && ipo.price_band_max
-                          ? `₹${ipo.price_band_min} - ₹${ipo.price_band_max}`
-                          : basePrice
-                          ? `₹${basePrice}`
-                          : 'TBA'}
-                      </td>
-
-                      {/* Latest GMP */}
-                      <td className="py-3.5 px-3 text-right font-extrabold text-slate-900">
-                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                          ₹{gmp.gmp_amount}
-                        </span>
-                      </td>
-
-                      {/* Kostak */}
-                      <td className="py-3.5 px-3 text-right font-medium text-amber-900">
-                        {gmp.kostak_rate ? `₹${gmp.kostak_rate}` : '—'}
-                      </td>
-
-                      {/* Subject to Sauda (SS) */}
-                      <td className="py-3.5 px-3 text-right font-medium text-indigo-900">
-                        {gmp.subject_to_sauda_rate ? `₹${gmp.subject_to_sauda_rate}` : '—'}
-                      </td>
-
-                      {/* Fire / Demand Rating */}
-                      <td className="py-3.5 px-2 text-center text-xs">
-                        {gmp.fire_rating ? (
-                          <span title={`${gmp.fire_rating}/5 Demand Rating`}>
-                            {'🔥'.repeat(gmp.fire_rating)}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-
-                      {/* Indicative Est. Listing Price */}
-                      <td className="py-3.5 px-3 text-right font-bold text-slate-900">
-                        {estPrice ? `₹${estPrice}` : 'N/A'}
-                      </td>
-
-                      {/* Est. Listing Gain (%) */}
-                      <td
-                        className={`py-3.5 px-3 text-right font-bold text-xs ${
-                          gainPct && gainPct >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                        }`}
+                    <td className="py-4 px-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/ipo/${ipo.slug}`);
+                        }}
+                        className="px-3.5 py-1.5 bg-white border border-[#E5E7EB] hover:bg-[#FAFAFA] hover:border-[#111827] text-[#111827] text-sm font-medium rounded-lg transition-colors"
                       >
-                        {gainPct !== null ? `${gainPct >= 0 ? '+' : ''}${gainPct}%` : 'N/A'}
-                      </td>
-
-                      {/* Live Subscription */}
-                      <td className="py-3.5 px-3 text-center">
-                        {ipo.latest_subscription ? (
-                          <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                              ipo.latest_subscription.total_multiple >= 10
-                                ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                : ipo.latest_subscription.total_multiple >= 2
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-700 border border-slate-200'
-                            }`}
-                          >
-                            {ipo.latest_subscription.total_multiple}x
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-[11px] font-sans">—</span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3.5 px-3 text-center font-sans">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenAllotment(ipo.slug);
-                            }}
-                            className="px-2 py-1 text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
-                          >
-                            Allotment
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/ipo/${ipo.slug}`);
-                            }}
-                            className="px-2 py-1 text-[10px] font-semibold bg-slate-100 text-slate-800 rounded hover:bg-slate-200 transition-colors"
-                          >
-                            Details
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        Details
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Auto Allotment Checker Modal */}
+      {/* Allotment Modal */}
       <AllotmentCheckerModal
         isOpen={allotmentModalOpen}
         onClose={() => setAllotmentModalOpen(false)}

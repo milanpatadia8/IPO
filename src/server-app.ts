@@ -11,9 +11,11 @@ import { IPOCategory, IPOStatus } from './types/ipo';
 
 export async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const isProduction = process.env.NODE_ENV === 'production';
+  // In development, the dev server must always run on port 3000
+  // In production (e.g. Cloud Run), it uses process.env.PORT || 8080
+  const PORT = isProduction ? (process.env.PORT ? parseInt(process.env.PORT, 10) : 8080) : 3000;
   const distDir = path.resolve(process.cwd(), 'dist');
-  const isProduction = process.env.NODE_ENV === 'production' || fs.existsSync(path.resolve(distDir, 'index.html'));
 
   // Middlewares
   app.use(express.json({ limit: '10mb' }));
@@ -218,14 +220,23 @@ export async function startServer() {
     }
   });
 
+  const getActor = (req: Request) => {
+    const rawId = req.headers['x-admin-id'] ? String(req.headers['x-admin-id']) : 'admin-1';
+    const rawName = req.headers['x-admin-name'] ? String(req.headers['x-admin-name']) : 'Milan Patadia';
+    try {
+      return {
+        id: decodeURIComponent(rawId),
+        name: decodeURIComponent(rawName),
+      };
+    } catch {
+      return { id: rawId, name: rawName };
+    }
+  };
+
   // Admin Create IPO
   app.post('/api/admin/ipos', (req: Request, res: Response) => {
     try {
-      const actor = {
-        id: req.headers['x-admin-id'] ? String(req.headers['x-admin-id']) : 'admin-1',
-        name: req.headers['x-admin-name'] ? String(req.headers['x-admin-name']) : 'Milan Patadia',
-      };
-      const created = ipoStore.createIPO(req.body, actor);
+      const created = ipoStore.createIPO(req.body, getActor(req));
       res.status(201).json({ success: true, data: created });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Internal server error';
@@ -233,15 +244,11 @@ export async function startServer() {
     }
   });
 
-  // Admin Update IPO
-  app.patch('/api/admin/ipos/:id', (req: Request, res: Response) => {
+  // Admin Update IPO (supports both PATCH and PUT)
+  const handleUpdateIpo = (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const actor = {
-        id: req.headers['x-admin-id'] ? String(req.headers['x-admin-id']) : 'admin-1',
-        name: req.headers['x-admin-name'] ? String(req.headers['x-admin-name']) : 'Milan Patadia',
-      };
-      const updated = ipoStore.updateIPO(id, req.body, actor);
+      const updated = ipoStore.updateIPO(id, req.body, getActor(req));
       if (!updated) {
         return res.status(404).json({ success: false, error: 'IPO not found' });
       }
@@ -250,23 +257,28 @@ export async function startServer() {
       const message = err instanceof Error ? err.message : 'Internal server error';
       res.status(400).json({ success: false, error: message });
     }
-  });
+  };
 
-  // Admin Delete IPO
-  app.delete('/api/admin/ipos/:id', (req: Request, res: Response) => {
+  app.patch('/api/admin/ipos/:id', handleUpdateIpo);
+  app.put('/api/admin/ipos/:id', handleUpdateIpo);
+
+  // Admin Delete IPO (supports DELETE and POST fallback)
+  const handleDeleteIpo = (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const actor = {
-        id: req.headers['x-admin-id'] ? String(req.headers['x-admin-id']) : 'admin-1',
-        name: req.headers['x-admin-name'] ? String(req.headers['x-admin-name']) : 'Milan Patadia',
-      };
-      const success = ipoStore.deleteIPO(id, actor);
-      res.json({ success });
+      const success = ipoStore.deleteIPO(id, getActor(req));
+      if (!success) {
+        return res.status(404).json({ success: false, error: 'IPO not found' });
+      }
+      res.json({ success: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Internal server error';
       res.status(500).json({ success: false, error: message });
     }
-  });
+  };
+
+  app.delete('/api/admin/ipos/:id', handleDeleteIpo);
+  app.post('/api/admin/ipos/:id/delete', handleDeleteIpo);
 
   // Admin Add GMP Snapshot
   app.post('/api/admin/gmp', (req: Request, res: Response) => {

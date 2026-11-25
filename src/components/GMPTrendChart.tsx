@@ -19,7 +19,7 @@ interface GMPTrendChartProps {
 export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice }) => {
   if (!history || history.length === 0) {
     return (
-      <div className="h-56 flex items-center justify-center border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
+      <div className="h-56 flex items-center justify-center border border-dashed border-[#E5E7EB] rounded-xl text-[#4B5563] text-sm">
         No historical GMP snapshots recorded yet
       </div>
     );
@@ -47,24 +47,24 @@ export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice
     <div className="w-full">
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <AreaChart data={data} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
             <defs>
               <linearGradient id="gmpGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0284c7" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                <stop offset="5%" stopColor="#111827" stopOpacity={0.12} />
+                <stop offset="95%" stopColor="#111827" stopOpacity={0.0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EAEAEA" />
             <XAxis
               dataKey="date"
-              stroke="#94a3b8"
-              fontSize={11}
+              stroke="#4B5563"
+              fontSize={12}
               tickLine={false}
-              axisLine={{ stroke: '#cbd5e1' }}
+              axisLine={{ stroke: '#E5E7EB' }}
             />
             <YAxis
-              stroke="#94a3b8"
-              fontSize={11}
+              stroke="#4B5563"
+              fontSize={12}
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => `₹${v}`}
@@ -74,19 +74,19 @@ export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice
                 if (active && payload && payload.length) {
                   const item = payload[0].payload;
                   return (
-                    <div className="bg-slate-900 text-white p-2.5 rounded shadow-lg text-xs space-y-1">
-                      <div className="font-semibold text-slate-200">{item.date}</div>
-                      <div className="flex items-center justify-between gap-4 font-mono tabular-nums">
-                        <span className="text-slate-400">GMP Quote:</span>
-                        <span className="font-bold text-sky-400">₹{item.gmp}</span>
+                    <div className="bg-[#111827] text-white p-3 rounded-lg shadow-lg text-sm space-y-1.5">
+                      <div className="font-medium text-neutral-200">{item.date}</div>
+                      <div className="flex items-center justify-between gap-4 tabular-nums">
+                        <span className="text-neutral-300">GMP Quote:</span>
+                        <span className="font-semibold text-white">₹{item.gmp}</span>
                       </div>
                       {basePrice && (
-                        <div className="flex items-center justify-between gap-4 font-mono tabular-nums">
-                          <span className="text-slate-400">Est. Gain:</span>
-                          <span className="font-bold text-emerald-400">+{item.gainPct}%</span>
+                        <div className="flex items-center justify-between gap-4 tabular-nums">
+                          <span className="text-neutral-300">Est. Gain:</span>
+                          <span className="font-semibold text-[#4ADE80]">+{item.gainPct}%</span>
                         </div>
                       )}
-                      <div className="text-[10px] text-slate-400 border-t border-slate-800 pt-1 mt-1">
+                      <div className="text-xs text-neutral-300 border-t border-neutral-800 pt-1.5 mt-1">
                         Source: {item.source}
                       </div>
                     </div>
@@ -98,7 +98,7 @@ export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice
             <Area
               type="monotone"
               dataKey="gmp"
-              stroke="#0284c7"
+              stroke="#111827"
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#gmpGradient)"
@@ -106,7 +106,7 @@ export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 px-1">
+      <div className="flex items-center justify-between text-xs text-[#4B5563] pt-2 px-1">
         <span>Timeline of accepted dealer observations</span>
         <span>All amounts in INR</span>
       </div>

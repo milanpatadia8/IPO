@@ -75,267 +75,202 @@ export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
         const gB = resB ? calculateListingGainPercentage(resB.issue_price, resB.listing_price) : 999;
         return gA - gB;
       }
-      case 'date_desc':
-        return (
-          new Date(resB?.listing_date || 0).getTime() - new Date(resA?.listing_date || 0).getTime()
-        );
-      case 'date_asc':
-        return (
-          new Date(resA?.listing_date || 0).getTime() - new Date(resB?.listing_date || 0).getTime()
-        );
       case 'size_desc':
         return (b.issue_size || 0) - (a.issue_size || 0);
       case 'name_asc':
         return (a.company?.name || a.slug).localeCompare(b.company?.name || b.slug);
+      case 'date_asc':
+        return new Date(a.listing_date || 0).getTime() - new Date(b.listing_date || 0).getTime();
+      case 'date_desc':
       default:
-        return 0;
+        return new Date(b.listing_date || 0).getTime() - new Date(a.listing_date || 0).getTime();
     }
   });
 
-  // Data for listing comparison chart
-  const chartData = list
-    .filter((i) => i.listing_result)
-    .slice(0, 8)
-    .map((i) => ({
-      company: i.company?.name?.split(' ')[0] || i.slug,
-      gainPct: calculateListingGainPercentage(
-        i.listing_result!.issue_price,
-        i.listing_result!.listing_price
-      ),
-      issuePrice: i.listing_result!.issue_price,
-      listingPrice: i.listing_result!.listing_price,
-    }));
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Past IPOs & Historical Listing Performance
+      <div className="space-y-2 border-b border-[#EAEAEA] pb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-[#111827] tracking-tight">
+          Historical Listing Performance
         </h1>
-        <p className="text-sm text-slate-600 max-w-3xl">
-          Historical record of all closed and listed Indian public issues. Listing gains and losses are strictly calculated using actual verified exchange debut prices versus finalized issue prices.
+        <p className="text-base text-[#4B5563] max-w-2xl leading-relaxed">
+          Verified IPO listing debut prices across NSE and BSE. Review issue prices against opening exchange rates.
         </p>
       </div>
 
-      {/* Listing Performance Visual Chart */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-3">
+      {/* Visual Chart */}
+      <div className="bg-white border border-[#EAEAEA] rounded-xl p-6 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900">
-            Listing Day Performance Comparison (% Return on Debut)
-          </h2>
-          <span className="text-xs text-slate-400">Green = Listing Premium · Red = Discount</span>
+          <h2 className="text-lg font-semibold text-[#111827]">First-Day Listing Gains (%)</h2>
+          <span className="text-xs text-[#4B5563]">Verified exchange data</span>
         </div>
-        <ListingGainChart data={chartData} />
+        <ListingGainChart ipos={ipos} />
       </div>
 
-      {/* Search, Filter & Sort Controls */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-        {/* Search */}
+      {/* Filter and Search Bar */}
+      <div className="bg-white border border-[#EAEAEA] rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Search listed IPOs by company name..."
+            placeholder="Search listed companies or symbols..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-md focus:bg-white focus:border-slate-400 outline-none transition-colors"
+            className="w-full h-10 pl-9 pr-3 text-sm bg-[#FAFAFA] border border-[#E5E7EB] focus:border-[#111827] rounded-lg outline-none text-[#111827] transition-colors"
           />
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#6B7280] absolute left-3 top-3 pointer-events-none" />
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-md border border-slate-200">
+          <div className="flex items-center gap-1 p-1 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg">
             <button
-              onClick={() => setCategoryFilter('all')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                categoryFilter === 'all'
-                  ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+              onClick={() => setPerformanceFilter('all')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                performanceFilter === 'all'
+                  ? 'bg-[#111827] text-white font-medium'
+                  : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
               All
             </button>
             <button
-              onClick={() => setCategoryFilter('Mainboard')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                categoryFilter === 'Mainboard'
-                  ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+              onClick={() => setPerformanceFilter('gain')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                performanceFilter === 'gain'
+                  ? 'bg-[#16A34A] text-white font-medium'
+                  : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
-              Mainboard
+              Premium
             </button>
             <button
-              onClick={() => setCategoryFilter('SME')}
-              className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                categoryFilter === 'SME'
-                  ? 'bg-white font-semibold text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+              onClick={() => setPerformanceFilter('loss')}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                performanceFilter === 'loss'
+                  ? 'bg-[#DC2626] text-white font-medium'
+                  : 'text-[#4B5563] hover:text-[#111827]'
               }`}
             >
-              SME
+              Discount
             </button>
           </div>
 
-          {/* Performance filter */}
-          <select
-            value={performanceFilter}
-            onChange={(e) => setPerformanceFilter(e.target.value as any)}
-            className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 outline-none hover:border-slate-300"
-          >
-            <option value="all">All Returns</option>
-            <option value="gain">Listing Gain Only (Positive)</option>
-            <option value="loss">Listing Loss / Discount (Negative)</option>
-          </select>
-
-          {/* Sort By */}
           <select
             value={sortOption}
             onChange={(e) => setSortOption(e.target.value as any)}
-            className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-md text-slate-700 outline-none hover:border-slate-300 font-medium"
+            className="h-10 px-3 text-sm bg-white border border-[#E5E7EB] rounded-lg text-[#111827] outline-none focus:border-[#111827]"
           >
-            <option value="gain_desc">Highest Listing Gain (%)</option>
-            <option value="gain_asc">Largest Listing Loss (%)</option>
+            <option value="gain_desc">Highest Gain (%)</option>
+            <option value="gain_asc">Lowest Gain (%)</option>
             <option value="date_desc">Latest Listing Date</option>
             <option value="date_asc">Oldest Listing Date</option>
             <option value="size_desc">Largest Issue Size</option>
-            <option value="name_asc">Company Name (A-Z)</option>
+            <option value="name_asc">Company (A-Z)</option>
           </select>
         </div>
       </div>
 
-      {/* Historical Data Table */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+      {/* Table */}
+      <div className="overflow-x-auto bg-white border border-[#EAEAEA] rounded-xl">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-[#FAFAFA] border-b border-[#EAEAEA] text-[#4B5563] font-semibold text-xs">
+            <tr>
+              <th className="py-3.5 px-4">Company</th>
+              <th className="py-3.5 px-3">Listing Date</th>
+              <th className="py-3.5 px-3 text-right">Issue Price</th>
+              <th className="py-3.5 px-3 text-right">Listing Price</th>
+              <th className="py-3.5 px-3 text-right">Listing Gain (₹)</th>
+              <th className="py-3.5 px-3 text-right">Return (%)</th>
+              <th className="py-3.5 px-3 text-right">Issue Size</th>
+              <th className="py-3.5 px-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#EAEAEA] bg-white">
+            {loading ? (
               <tr>
-                <th className="py-3.5 px-4">Company Name</th>
-                <th className="py-3.5 px-4">Category</th>
-                <th className="py-3.5 px-4">Listing Date</th>
-                <th className="py-3.5 px-4 text-right">Issue Size</th>
-                <th className="py-3.5 px-4 text-right">Final Sub.</th>
-                <th className="py-3.5 px-4 text-right">Issue Price</th>
-                <th className="py-3.5 px-4 text-right">Listing Price</th>
-                <th className="py-3.5 px-4 text-right">Day 1 Close</th>
-                <th className="py-3.5 px-4 text-right">Listing Gain (₹)</th>
-                <th className="py-3.5 px-4 text-right">Listing Gain (%)</th>
-                <th className="py-3.5 px-4 text-center">Action</th>
+                <td colSpan={8} className="py-12 text-center text-[#4B5563]">
+                  Loading listed IPOs...
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
-              {list.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400 font-sans">
-                    No historical records found for this query.
-                  </td>
-                </tr>
-              ) : (
-                list.map((ipo) => {
-                  const res = ipo.listing_result;
-                  if (!res) return null;
+            ) : list.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-12 text-center text-[#4B5563]">
+                  No listed IPO records match the selected criteria.
+                </td>
+              </tr>
+            ) : (
+              list.map((ipo) => {
+                const res = ipo.listing_result;
+                const gain = res ? calculateListingGain(res.issue_price, res.listing_price) : 0;
+                const gainPct = res ? calculateListingGainPercentage(res.issue_price, res.listing_price) : 0;
+                const isProfit = gain >= 0;
 
-                  const gainInRupees = calculateListingGain(res.issue_price, res.listing_price);
-                  const gainPercentage = calculateListingGainPercentage(
-                    res.issue_price,
-                    res.listing_price
-                  );
+                return (
+                  <tr
+                    key={ipo.id}
+                    onClick={() => navigate(`/ipo/${ipo.slug}`)}
+                    className="hover:bg-[#FAFAFA] transition-colors cursor-pointer group"
+                  >
+                    <td className="py-4 px-4">
+                      <div className="font-semibold text-[#111827] text-sm sm:text-[15px]">
+                        {ipo.company?.name || ipo.slug}
+                      </div>
+                      <div className="text-xs text-[#4B5563] flex items-center gap-1.5 mt-0.5">
+                        <span>{ipo.category}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{ipo.exchange}</span>
+                      </div>
+                    </td>
 
-                  return (
-                    <tr key={ipo.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3.5 px-4 font-sans">
-                        <div className="font-semibold text-slate-900">
-                          {ipo.company?.name || ipo.slug}
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-normal">
-                          {ipo.exchange}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1">
-                          <a
-                            href={getValidDocUrl(ipo.rhp_url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-700 hover:text-blue-900 font-semibold hover:underline flex items-center gap-0.5"
-                            title="Red Herring Prospectus (SEBI Filing)"
-                          >
-                            <span>RHP</span>
-                            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-                          </a>
-                          <span>·</span>
-                          <a
-                            href={getValidDocUrl(ipo.drhp_url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-slate-600 hover:text-slate-900 hover:underline flex items-center gap-0.5"
-                            title="Draft Red Herring Prospectus (SEBI Filing)"
-                          >
-                            <span>DRHP</span>
-                            <ExternalLink className="w-2.5 h-2.5 opacity-60" />
-                          </a>
-                        </div>
-                      </td>
+                    <td className="py-4 px-3 whitespace-nowrap tabular-nums text-sm text-[#4B5563]">
+                      {formatIndianDate(ipo.listing_date)}
+                    </td>
 
-                      <td className="py-3.5 px-4 font-sans text-slate-700">{ipo.category}</td>
+                    <td className="py-4 px-3 text-right tabular-nums text-[#111827]">
+                      ₹{res?.issue_price ?? ipo.issue_price ?? '-'}
+                    </td>
 
-                      <td className="py-3.5 px-4 font-sans text-slate-700">
-                        {formatIndianDate(res.listing_date)}
-                      </td>
+                    <td className="py-4 px-3 text-right tabular-nums font-medium text-[#111827]">
+                      ₹{res?.listing_price ?? '-'}
+                    </td>
 
-                      <td className="py-3.5 px-4 text-right text-slate-800">
-                        {formatCrores(ipo.issue_size)}
-                      </td>
+                    <td
+                      className={`py-4 px-3 text-right tabular-nums font-medium ${
+                        isProfit ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                      }`}
+                    >
+                      {isProfit ? `+₹${gain}` : `-₹${Math.abs(gain)}`}
+                    </td>
 
-                      <td className="py-3.5 px-4 text-right font-medium text-slate-800">
-                        {ipo.latest_subscription
-                          ? `${ipo.latest_subscription.total_multiple.toFixed(2)}x`
-                          : 'N/A'}
-                      </td>
+                    <td
+                      className={`py-4 px-3 text-right tabular-nums font-semibold ${
+                        isProfit ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                      }`}
+                    >
+                      {isProfit ? `+${gainPct}%` : `${gainPct}%`}
+                    </td>
 
-                      <td className="py-3.5 px-4 text-right font-semibold text-slate-900">
-                        ₹{res.issue_price}
-                      </td>
+                    <td className="py-4 px-3 text-right tabular-nums text-[#4B5563]">
+                      {formatCrores(ipo.issue_size)}
+                    </td>
 
-                      <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                        ₹{res.listing_price}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right text-slate-700">
-                        {res.first_day_close ? `₹${res.first_day_close}` : 'N/A'}
-                      </td>
-
-                      <td
-                        className={`py-3.5 px-4 text-right font-bold ${
-                          gainInRupees >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                        }`}
+                    <td className="py-4 px-4 text-right whitespace-nowrap">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/ipo/${ipo.slug}`);
+                        }}
+                        className="px-3.5 py-1.5 bg-white border border-[#E5E7EB] hover:bg-[#FAFAFA] hover:border-[#111827] text-[#111827] text-sm font-medium rounded-lg transition-colors"
                       >
-                        {gainInRupees >= 0 ? `+₹${gainInRupees}` : `-₹${Math.abs(gainInRupees)}`}
-                      </td>
-
-                      <td
-                        className={`py-3.5 px-4 text-right font-bold ${
-                          gainPercentage >= 0 ? 'text-emerald-700' : 'text-rose-700'
-                        }`}
-                      >
-                        {gainPercentage >= 0 ? `+${gainPercentage}%` : `${gainPercentage}%`}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center font-sans">
-                        <button
-                          onClick={() => navigate(`/ipo/${ipo.slug}`)}
-                          className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        Details
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

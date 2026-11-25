@@ -46,7 +46,7 @@ export type SourceType =
   | 'community_estimate'
   | 'manual';
 
-export type AdminRole = 'admin' | 'editor' | 'reviewer';
+export type AdminRole = 'admin' | 'editor' | 'reviewer' | 'user';
 
 export interface Company {
   id: string;

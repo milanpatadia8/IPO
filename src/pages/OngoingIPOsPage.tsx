@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { IPO, IPOCategory } from '../types/ipo';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { StatusIndicator } from '../components/StatusIndicator';
 import { GMPDisplay } from '../components/GMPDisplay';
 import { SubscriptionProgress } from '../components/SubscriptionProgress';
@@ -19,12 +20,15 @@ import { Search } from 'lucide-react';
 interface OngoingIPOsPageProps {
   navigate: (route: string) => void;
   searchParam?: string;
+  onRequireLogin?: (reason?: string, onAfterLogin?: () => void) => void;
 }
 
 export const OngoingIPOsPage: React.FC<OngoingIPOsPageProps> = ({
   navigate,
   searchParam = '',
+  onRequireLogin,
 }) => {
+  const { isSignedIn } = useAuth();
   const [ipos, setIPOs] = useState<IPO[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(searchParam);
@@ -196,10 +200,27 @@ export const OngoingIPOsPage: React.FC<OngoingIPOsPageProps> = ({
 
                     <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
                       <button
+                        type="button"
                         onClick={() => navigate(`/ipo/${ipo.slug}`)}
+                        className="px-3.5 py-2 bg-white hover:bg-[#FAFAFA] text-[#111827] border border-[#E5E7EB] font-medium text-sm rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isSignedIn && onRequireLogin) {
+                            onRequireLogin(
+                              `Login as an End User to apply for ${ipo.company?.name || ipo.slug}.`,
+                              () => navigate(`/ipo/${ipo.slug}?apply=1`)
+                            );
+                            return;
+                          }
+                          navigate(`/ipo/${ipo.slug}?apply=1`);
+                        }}
                         className="px-4 py-2 bg-[#111827] hover:bg-neutral-800 text-white font-medium text-sm rounded-lg transition-colors whitespace-nowrap"
                       >
-                        View Issue
+                        Apply for IPO
                       </button>
                     </div>
                   </div>

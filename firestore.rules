@@ -1,0 +1,447 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------
+    // Global Hardened Primitives
+    // ---------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrapAdmin() {
+      return isVerified() && request.auth.token.email == 'milanpatadia8@gmail.com';
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'milanpatadia8@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptionalNumber(data, field) {
+      return !(field in data) || (data[field] is int || data[field] is float);
+    }
+
+    function isOptionalMap(data, field) {
+      return !(field in data) || data[field] is map;
+    }
+
+    function isOptionalBoundedList(data, field, maxLen) {
+      return !(field in data) || (
+        data[field] is list &&
+        data[field].size() <= maxLen &&
+        (data[field].size() == 0 || data[field][0] is map)
+      );
+    }
+
+    // ---------------------------------------------------------
+    // Validation Blueprints
+    // ---------------------------------------------------------
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        isOptionalString(data, 'photoURL', 500) &&
+        data.role in ['user', 'admin'] &&
+        data.isActive is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        isValidId(data.grantedBy) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCompanyMap(comp) {
+      return comp is map &&
+        comp.keys().hasAll(['id', 'name', 'slug', 'created_at', 'updated_at']) &&
+        comp.keys().hasOnly(['id', 'name', 'slug', 'description', 'industry', 'website_url', 'logo_url', 'created_at', 'updated_at']) &&
+        isValidId(comp.id) &&
+        comp.name is string && comp.name.size() >= 1 && comp.name.size() <= 200 &&
+        comp.slug is string && comp.slug.size() >= 1 && comp.slug.size() <= 160 &&
+        isOptionalString(comp, 'description', 2000) &&
+        isOptionalString(comp, 'industry', 120) &&
+        isOptionalString(comp, 'website_url', 500) &&
+        isOptionalString(comp, 'logo_url', 500) &&
+        comp.created_at is string && comp.created_at.size() <= 64 &&
+        comp.updated_at is string && comp.updated_at.size() <= 64;
+    }
+
+    function isValidIPO(data) {
+      return data.keys().hasAll([
+          'id', 'company_id', 'company', 'slug', 'category', 'exchange',
+          'status', 'announcement_status', 'visibility', 'created_at',
+          'updated_at', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'company_id', 'company', 'slug', 'category', 'exchange',
+          'status', 'announcement_status', 'visibility',
+          'open_date', 'close_date', 'allotment_date', 'refund_date', 'demat_credit_date', 'listing_date',
+          'price_band_min', 'price_band_max', 'issue_price', 'lot_size',
+          'issue_size', 'fresh_issue_size', 'offer_for_sale_size',
+          'retail_quota_percent', 'qib_quota_percent', 'nii_quota_percent',
+          'registrar_name', 'registrar_url', 'drhp_url', 'rhp_url', 'official_source_url',
+          'data_verified_at', 'published_at', 'created_at', 'updated_at',
+          'latest_gmp', 'previous_gmp', 'gmp_history',
+          'latest_subscription', 'subscription_history', 'listing_result', 'important_dates',
+          'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.company_id) &&
+        isValidCompanyMap(data.company) &&
+        data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 160 && data.slug.matches('^[a-z0-9\\-]+$') &&
+        data.category in ['Mainboard', 'SME'] &&
+        data.exchange in ['NSE', 'BSE', 'NSE, BSE', 'BSE SME', 'NSE Emerge'] &&
+        data.status in ['upcoming', 'ongoing', 'closed', 'listed', 'postponed', 'withdrawn'] &&
+        data.announcement_status in ['confirmed', 'dates_announced', 'expected', 'awaiting_details', 'postponed', 'withdrawn'] &&
+        data.visibility in ['members'] &&
+        isOptionalString(data, 'open_date', 32) &&
+        isOptionalString(data, 'close_date', 32) &&
+        isOptionalString(data, 'allotment_date', 32) &&
+        isOptionalString(data, 'refund_date', 32) &&
+        isOptionalString(data, 'demat_credit_date', 32) &&
+        isOptionalString(data, 'listing_date', 32) &&
+        isOptionalNumber(data, 'price_band_min') &&
+        isOptionalNumber(data, 'price_band_max') &&
+        isOptionalNumber(data, 'issue_price') &&
+        isOptionalNumber(data, 'lot_size') &&
+        isOptionalNumber(data, 'issue_size') &&
+        isOptionalNumber(data, 'fresh_issue_size') &&
+        isOptionalNumber(data, 'offer_for_sale_size') &&
+        isOptionalNumber(data, 'retail_quota_percent') &&
+        isOptionalNumber(data, 'qib_quota_percent') &&
+        isOptionalNumber(data, 'nii_quota_percent') &&
+        isOptionalString(data, 'registrar_name', 200) &&
+        isOptionalString(data, 'registrar_url', 500) &&
+        isOptionalString(data, 'drhp_url', 500) &&
+        isOptionalString(data, 'rhp_url', 500) &&
+        isOptionalString(data, 'official_source_url', 500) &&
+        isOptionalString(data, 'data_verified_at', 64) &&
+        isOptionalString(data, 'published_at', 64) &&
+        data.created_at is string && data.created_at.size() <= 64 &&
+        data.updated_at is string && data.updated_at.size() <= 64 &&
+        isOptionalMap(data, 'latest_gmp') &&
+        isOptionalMap(data, 'previous_gmp') &&
+        isOptionalBoundedList(data, 'gmp_history', 100) &&
+        isOptionalMap(data, 'latest_subscription') &&
+        isOptionalBoundedList(data, 'subscription_history', 50) &&
+        isOptionalMap(data, 'listing_result') &&
+        isOptionalBoundedList(data, 'important_dates', 20) &&
+        isValidId(data.updatedBy) &&
+        data.updatedBy == request.auth.uid &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['id', 'actor_id', 'actor_name', 'action', 'entity_type', 'entity_id', 'created_at', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'actor_id', 'actor_name', 'action', 'entity_type', 'entity_id', 'before_summary', 'after_summary', 'created_at', 'createdAt']) &&
+        isValidId(data.id) &&
+        isValidId(data.actor_id) &&
+        data.actor_id == request.auth.uid &&
+        data.actor_name is string && data.actor_name.size() >= 1 && data.actor_name.size() <= 120 &&
+        data.action is string && data.action.size() >= 1 && data.action.size() <= 80 &&
+        data.entity_type is string && data.entity_type.size() >= 1 && data.entity_type.size() <= 60 &&
+        data.entity_id is string && data.entity_id.size() >= 1 && data.entity_id.size() <= 128 &&
+        isOptionalString(data, 'before_summary', 1000) &&
+        isOptionalString(data, 'after_summary', 1000) &&
+        data.created_at is string && data.created_at.size() <= 64 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidFeedRun(data) {
+      return data.keys().hasAll([
+          'id', 'provider_name', 'job_type', 'started_at', 'status',
+          'records_fetched', 'records_accepted', 'records_rejected', 'created_at', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'source_id', 'provider_name', 'job_type', 'started_at', 'finished_at',
+          'status', 'records_fetched', 'records_accepted', 'records_rejected', 'created_at', 'createdAt'
+        ]) &&
+        isValidId(data.id) &&
+        isOptionalString(data, 'source_id', 128) &&
+        data.provider_name is string && data.provider_name.size() >= 1 && data.provider_name.size() <= 150 &&
+        data.job_type in ['ipo_discovery', 'subscription_sync', 'gmp_sync', 'listing_sync', 'csv_import'] &&
+        data.started_at is string && data.started_at.size() <= 64 &&
+        isOptionalString(data, 'finished_at', 64) &&
+        data.status in ['running', 'success', 'partial', 'failed'] &&
+        (data.records_fetched is int || data.records_fetched is float) &&
+        (data.records_accepted is int || data.records_accepted is float) &&
+        (data.records_rejected is int || data.records_rejected is float) &&
+        data.created_at is string && data.created_at.size() <= 64 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidAppSettings(data) {
+      return data.keys().hasAll(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'updatedBy', 'updatedAt']) &&
+        data.keys().hasOnly(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'updatedBy', 'updatedAt']) &&
+        (data.gmpStalenessHours is int || data.gmpStalenessHours is float) &&
+        data.gmpStalenessHours >= 1 && data.gmpStalenessHours <= 168 &&
+        (data.subStalenessHours is int || data.subStalenessHours is float) &&
+        data.subStalenessHours >= 1 && data.subStalenessHours <= 168 &&
+        data.seeded is bool &&
+        isValidId(data.updatedBy) &&
+        data.updatedBy == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidIPOApplication(data) {
+      return data.keys().hasAll([
+          'id', 'userId', 'userEmail', 'userName', 'ipoId', 'ipoSlug',
+          'companyName', 'category', 'investorCategory', 'lots', 'shares',
+          'bidPrice', 'totalAmount', 'upiId', 'pan', 'status',
+          'created_at', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'userId', 'userEmail', 'userName', 'ipoId', 'ipoSlug',
+          'companyName', 'category', 'investorCategory', 'lots', 'shares',
+          'bidPrice', 'totalAmount', 'upiId', 'pan', 'status',
+          'created_at', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        isValidId(data.userId) &&
+        data.userEmail is string && data.userEmail.size() >= 3 && data.userEmail.size() <= 254 &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 120 &&
+        isValidId(data.ipoId) &&
+        data.ipoSlug is string && data.ipoSlug.size() >= 1 && data.ipoSlug.size() <= 160 && data.ipoSlug.matches('^[a-z0-9\\-]+$') &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 200 &&
+        data.category in ['Mainboard', 'SME'] &&
+        data.investorCategory in ['Retail', 'sHNI', 'bHNI'] &&
+        (data.lots is int || data.lots is float) && data.lots >= 1 && data.lots <= 100 &&
+        (data.shares is int || data.shares is float) && data.shares >= 1 && data.shares <= 10000000 &&
+        (data.bidPrice is int || data.bidPrice is float) && data.bidPrice > 0 && data.bidPrice <= 1000000 &&
+        (data.totalAmount is int || data.totalAmount is float) && data.totalAmount > 0 && data.totalAmount <= 1000000000 &&
+        data.upiId is string && data.upiId.size() >= 3 && data.upiId.size() <= 120 && data.upiId.matches('^[^\\s@]+@[^\\s@]+$') &&
+        data.pan is string && data.pan.size() == 10 && data.pan.matches('^[A-Z]{5}[0-9]{4}[A-Z]{1}$') &&
+        data.status in ['submitted', 'cancelled'] &&
+        data.created_at is string && data.created_at.size() <= 64 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /users/{userId} (PII Isolated)
+    // ---------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isVerified() && (existing().uid == request.auth.uid || isAdmin());
+
+      allow create: if isVerified() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == userId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (isOwner(userId) && incoming().email == request.auth.token.email && (incoming().role == 'user' || isBootstrapAdmin())) ||
+          isAdmin()
+        );
+
+      allow update: if isVerified() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'role', 'isActive', 'updatedAt'])) ||
+          (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']))
+        );
+
+      allow delete: if isVerified() && isValidId(userId) && isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /admins/{userId}
+    // ---------------------------------------------------------
+    match /admins/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isVerified() && isAdmin();
+
+      allow create: if isVerified() &&
+        isValidId(userId) &&
+        isValidAdminRecord(incoming()) &&
+        incoming().uid == userId &&
+        incoming().grantedBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        isAdmin();
+
+      allow update: if isVerified() &&
+        isValidId(userId) &&
+        isValidAdminRecord(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'grantedBy']);
+
+      allow delete: if isVerified() && isValidId(userId) && isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /ipos/{ipoId}
+    // ---------------------------------------------------------
+    match /ipos/{ipoId} {
+      allow get: if isValidId(ipoId) && (existing().visibility == 'members' || isAdmin());
+      allow list: if existing().visibility == 'members' || isAdmin();
+
+      allow create: if isVerified() &&
+        isValidId(ipoId) &&
+        isValidIPO(incoming()) &&
+        incoming().id == ipoId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+
+      allow update: if isVerified() &&
+        isValidId(ipoId) &&
+        isValidIPO(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'company', 'slug', 'category', 'exchange', 'status', 'announcement_status', 'visibility',
+          'open_date', 'close_date', 'allotment_date', 'refund_date', 'demat_credit_date', 'listing_date',
+          'price_band_min', 'price_band_max', 'issue_price', 'lot_size',
+          'issue_size', 'fresh_issue_size', 'offer_for_sale_size',
+          'retail_quota_percent', 'qib_quota_percent', 'nii_quota_percent',
+          'registrar_name', 'registrar_url', 'drhp_url', 'rhp_url', 'official_source_url',
+          'data_verified_at', 'published_at', 'updated_at',
+          'latest_gmp', 'previous_gmp', 'gmp_history',
+          'latest_subscription', 'subscription_history', 'listing_result', 'important_dates',
+          'updatedBy', 'updatedAt'
+        ]);
+
+      allow delete: if isVerified() && isValidId(ipoId) && isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /audit_logs/{logId} (Immutable Append-Only)
+    // ---------------------------------------------------------
+    match /audit_logs/{logId} {
+      allow get: if isVerified() && isValidId(logId) && isAdmin();
+      allow list: if isVerified() && isAdmin();
+
+      allow create: if isVerified() &&
+        isValidId(logId) &&
+        isValidAuditLog(incoming()) &&
+        incoming().id == logId &&
+        incoming().createdAt == request.time &&
+        isAdmin();
+
+      allow update, delete: if false;
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /feed_runs/{runId}
+    // ---------------------------------------------------------
+    match /feed_runs/{runId} {
+      allow get: if isVerified() && isValidId(runId) && isAdmin();
+      allow list: if isVerified() && isAdmin();
+
+      allow create: if isVerified() &&
+        isValidId(runId) &&
+        isValidFeedRun(incoming()) &&
+        incoming().id == runId &&
+        incoming().createdAt == request.time &&
+        isAdmin();
+
+      allow update, delete: if false;
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /app_settings/{settingId}
+    // ---------------------------------------------------------
+    match /app_settings/{settingId} {
+      allow get: if isValidId(settingId) && (settingId == 'global' || isAdmin());
+      allow list: if false;
+
+      allow create: if isVerified() &&
+        isValidId(settingId) &&
+        isValidAppSettings(incoming()) &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+
+      allow update: if isVerified() &&
+        isValidId(settingId) &&
+        isValidAppSettings(incoming()) &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'updatedBy', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /ipo_applications/{applicationId} (End-User Private)
+    // ---------------------------------------------------------
+    match /ipo_applications/{applicationId} {
+      allow get: if isVerified() && isValidId(applicationId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isVerified() && (existing().userId == request.auth.uid || isAdmin());
+
+      allow create: if isVerified() &&
+        isValidId(applicationId) &&
+        isValidIPOApplication(incoming()) &&
+        incoming().id == applicationId &&
+        incoming().userId == request.auth.uid &&
+        incoming().userEmail == request.auth.token.email &&
+        incoming().status == 'submitted' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerified() &&
+        isValidId(applicationId) &&
+        isValidIPOApplication(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+        (
+          (existing().userId == request.auth.uid && existing().status == 'submitted' && incoming().status == 'cancelled') ||
+          isAdmin()
+        );
+
+      allow delete: if isVerified() && isValidId(applicationId) && isAdmin();
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { IPO } from '../types/ipo';
-import { api } from '../lib/api';
+import { api, IPOApplication } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { StatusIndicator } from '../components/StatusIndicator';
 import { GMPDisplay } from '../components/GMPDisplay';
 import { SubscriptionProgress } from '../components/SubscriptionProgress';
@@ -41,15 +42,31 @@ import {
 interface IPODetailPageProps {
   slug: string;
   navigate: (route: string) => void;
+  onRequireLogin?: (reason?: string, onAfterLogin?: () => void) => void;
 }
 
-export const IPODetailPage: React.FC<IPODetailPageProps> = ({ slug, navigate }) => {
+export const IPODetailPage: React.FC<IPODetailPageProps> = ({
+  slug,
+  navigate,
+  onRequireLogin,
+}) => {
+  const { profile, isSignedIn } = useAuth();
   const [ipo, setIpo] = useState<IPO | null>(null);
   const [loading, setLoading] = useState(true);
   const [related, setRelated] = useState<IPO[]>([]);
   const [copied, setCopied] = useState(false);
   const [allotmentModalOpen, setAllotmentModalOpen] = useState(false);
   const [applyModalOpen, setApplyModalOpen] = useState(false);
+
+  // End-user IPO application state
+  const [userApplications, setUserApplications] = useState<IPOApplication[]>([]);
+  const [investorCategory, setInvestorCategory] = useState<'Retail' | 'sHNI' | 'bHNI'>('Retail');
+  const [lots, setLots] = useState<number>(1);
+  const [pan, setPan] = useState<string>('');
+  const [upiId, setUpiId] = useState<string>('');
+  const [applySubmitting, setApplySubmitting] = useState<boolean>(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [submittedApp, setSubmittedApp] = useState<IPOApplication | null>(null);
 
   useEffect(() => {
     async function loadIPO() {
@@ -71,6 +88,38 @@ export const IPODetailPage: React.FC<IPODetailPageProps> = ({ slug, navigate }) 
     }
     loadIPO();
   }, [slug]);
+
+  // Load current user's applications for this IPO
+  useEffect(() => {
+    if (!isSignedIn || !profile?.uid || !ipo?.id) {
+      setUserApplications([]);
+      return;
+    }
+    api
+      .getUserIPOApplications(profile.uid, ipo.id)
+      .then(setUserApplications)
+      .catch((err) => console.error('Failed to load user IPO applications:', err));
+  }, [isSignedIn, profile?.uid, ipo?.id]);
+
+  // Handle ?apply=1 query parameter from Open IPOs page
+  useEffect(() => {
+    if (!ipo || ipo.status !== 'ongoing') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('apply') === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+      if (isSignedIn) {
+        setApplyError(null);
+        setSubmittedApp(null);
+        setApplyModalOpen(true);
+      } else if (onRequireLogin) {
+        onRequireLogin(`Login to apply for ${ipo.company?.name || ipo.slug}`, () => {
+          setApplyError(null);
+          setSubmittedApp(null);
+          setApplyModalOpen(true);
+        });
+      }
+    }
+  }, [ipo, isSignedIn, onRequireLogin]);
 
   if (loading) {
     return (
@@ -222,14 +271,63 @@ export const IPODetailPage: React.FC<IPODetailPageProps> = ({ slug, navigate }) 
             </div>
             <div className="pt-1 space-y-2">
               {ipo.status === 'ongoing' ? (
-                <button
-                  onClick={() => setApplyModalOpen(true)}
-                  className="w-full py-2.5 bg-[#111827] hover:bg-neutral-800 text-white rounded-lg text-sm font-medium transition-colors text-center"
-                >
-                  Apply via UPI on Broker
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isSignedIn) {
+                        if (onRequireLogin) {
+                          onRequireLogin(
+                            `Login as an End User to apply for ${ipo.company?.name || ipo.slug}.`,
+                            () => {
+                              setApplyError(null);
+                              setSubmittedApp(null);
+                              setApplyModalOpen(true);
+                            }
+                          );
+                        }
+                        return;
+                      }
+                      setApplyError(null);
+                      setSubmittedApp(null);
+                      setApplyModalOpen(true);
+                    }}
+                    className="w-full py-2.5 bg-[#111827] hover:bg-neutral-800 text-white rounded-lg text-sm font-medium transition-colors text-center"
+                  >
+                    Apply for IPO
+                  </button>
+                  {!isSignedIn && (
+                    <p className="text-xs text-[#6B7280] text-center">
+                      Login required to submit an IPO application
+                    </p>
+                  )}
+                  {userApplications.some((a) => a.status === 'submitted') && (
+                    <div className="p-2.5 bg-green-50 border border-green-200 rounded-lg text-xs text-[#166534] flex items-center justify-between gap-2">
+                      <span className="font-medium">
+                        Applied ({userApplications.find((a) => a.status === 'submitted')?.lots} lot
+                        {(userApplications.find((a) => a.status === 'submitted')?.lots || 1) > 1 ? 's' : ''})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const active = userApplications.find((a) => a.status === 'submitted');
+                          if (!active) return;
+                          await api.cancelIPOApplication(active.id);
+                          if (profile?.uid) {
+                            const updated = await api.getUserIPOApplications(profile.uid, ipo.id);
+                            setUserApplications(updated);
+                          }
+                        }}
+                        className="text-[#DC2626] font-medium hover:underline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <button
+                  type="button"
                   onClick={() => setAllotmentModalOpen(true)}
                   className="w-full py-2.5 bg-[#111827] hover:bg-neutral-800 text-white rounded-lg text-sm font-medium transition-colors text-center"
                 >
@@ -610,11 +708,18 @@ export const IPODetailPage: React.FC<IPODetailPageProps> = ({ slug, navigate }) 
         preselectedSlug={ipo.slug}
       />
 
-      {/* Apply via UPI Modal */}
+      {/* Apply for IPO Modal (Authenticated End Users) */}
       {applyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-[#EAEAEA] shadow-xl max-w-lg w-full p-6 relative space-y-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4"
+          onClick={() => setApplyModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl border border-[#EAEAEA] shadow-xl max-w-lg w-full p-6 relative space-y-5 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
+              type="button"
               onClick={() => setApplyModalOpen(false)}
               className="absolute top-4 right-4 text-[#6B7280] hover:text-[#111827] p-1 rounded-lg transition-colors"
               aria-label="Close dialog"
@@ -622,40 +727,230 @@ export const IPODetailPage: React.FC<IPODetailPageProps> = ({ slug, navigate }) 
               <X className="w-5 h-5" />
             </button>
 
-            <div className="space-y-1">
+            <div className="space-y-1 pr-6">
               <span className="text-xs font-medium text-[#4B5563]">
-                UPI Bidding Guidelines
+                End User IPO Application · UPI ASBA
               </span>
               <h3 className="text-lg font-semibold text-[#111827]">
-                How to apply for {ipo.company?.name || ipo.slug}
+                Apply for {ipo.company?.name || ipo.slug}
               </h3>
             </div>
 
-            <div className="space-y-3 text-sm text-[#4B5563] leading-relaxed">
-              <div className="p-3.5 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg space-y-1">
-                <div className="font-semibold text-[#111827]">Step 1: Open your trading account</div>
-                <div>Log into your broker app or website (e.g. Zerodha Kite, Groww, AngelOne, Upstox) and navigate to <strong>Bids &gt; IPO</strong>.</div>
-              </div>
+            {submittedApp ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2 text-[#166534] font-semibold text-sm">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>IPO Application Submitted</span>
+                  </div>
+                  <p className="text-xs text-[#166534] leading-relaxed">
+                    Your bid request has been recorded under <strong>{submittedApp.userEmail}</strong>. Please approve the UPI mandate on <strong>{submittedApp.upiId}</strong> before 5:00 PM on {formatIndianDate(ipo.close_date)}.
+                  </p>
+                </div>
 
-              <div className="p-3.5 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg space-y-1">
-                <div className="font-semibold text-[#111827]">Step 2: Enter bid details</div>
-                <div>Select <strong>{ipo.company?.name || ipo.slug}</strong>, enter your UPI ID, enter quantity in lots of <strong>{ipo.lot_size || 1}</strong> shares, and opt for cut-off price (₹{ipo.price_band_max || ipo.issue_price || 'TBA'}).</div>
-              </div>
+                <div className="bg-[#FAFAFA] border border-[#EAEAEA] rounded-xl p-4 space-y-2 text-sm tabular-nums">
+                  <div className="flex justify-between">
+                    <span className="text-[#4B5563]">Reference ID</span>
+                    <span className="font-medium text-[#111827]">{submittedApp.id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#4B5563]">Category</span>
+                    <span className="font-medium text-[#111827]">{submittedApp.investorCategory}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#4B5563]">Quantity</span>
+                    <span className="font-medium text-[#111827]">
+                      {submittedApp.lots} lot{submittedApp.lots > 1 ? 's' : ''} ({submittedApp.shares} shares)
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#4B5563]">Cut-off Price</span>
+                    <span className="font-medium text-[#111827]">₹{submittedApp.bidPrice}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-[#EAEAEA]">
+                    <span className="font-semibold text-[#111827]">Total Amount</span>
+                    <span className="font-semibold text-[#111827]">
+                      ₹{submittedApp.totalAmount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
 
-              <div className="p-3.5 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg space-y-1">
-                <div className="font-semibold text-[#111827]">Step 3: Authorize UPI Mandate</div>
-                <div>Open your UPI app (Google Pay, PhonePe, BHIM, Paytm, or CRED) and approve the mandate before 5:00 PM on the closing date ({formatIndianDate(ipo.close_date)}). Funds remain in your bank account until allotment.</div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setApplyModalOpen(false)}
+                    className="px-4 py-2 bg-[#111827] hover:bg-neutral-800 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                onClick={() => setApplyModalOpen(false)}
-                className="px-4 py-2 bg-[#111827] hover:bg-neutral-800 text-white text-sm font-medium rounded-lg transition-colors"
+            ) : (
+              <form
+                className="space-y-4"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setApplyError(null);
+                  setApplySubmitting(true);
+                  try {
+                    const created = await api.submitIPOApplication({
+                      ipo,
+                      investorCategory,
+                      lots,
+                      upiId,
+                      pan,
+                    });
+                    setSubmittedApp(created);
+                    if (profile?.uid) {
+                      const updated = await api.getUserIPOApplications(profile.uid, ipo.id);
+                      setUserApplications(updated);
+                    }
+                  } catch (err: any) {
+                    setApplyError(err?.message || 'Could not submit IPO application.');
+                  } finally {
+                    setApplySubmitting(false);
+                  }
+                }}
               >
-                Got It
-              </button>
-            </div>
+                {applyError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-[#DC2626] text-sm rounded-lg">
+                    {applyError}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-[#4B5563] block">
+                    Investor Category
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['Retail', 'sHNI', 'bHNI'] as const).map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setInvestorCategory(cat)}
+                        className={`py-2 text-sm rounded-lg border font-medium transition-colors ${
+                          investorCategory === cat
+                            ? 'bg-[#111827] text-white border-[#111827]'
+                            : 'bg-white text-[#4B5563] border-[#E5E7EB] hover:border-[#111827]'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[#4B5563] block">
+                      Number of Lots
+                    </label>
+                    <div className="flex items-center border border-[#E5E7EB] rounded-lg overflow-hidden bg-[#FAFAFA]">
+                      <button
+                        type="button"
+                        onClick={() => setLots((prev) => Math.max(1, prev - 1))}
+                        className="px-3.5 py-2 text-sm font-semibold text-[#111827] hover:bg-[#EAEAEA] transition-colors"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={lots}
+                        onChange={(e) =>
+                          setLots(Math.min(100, Math.max(1, Number(e.target.value) || 1)))
+                        }
+                        className="w-full text-center bg-transparent text-sm font-semibold text-[#111827] outline-none tabular-nums"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setLots((prev) => Math.min(100, prev + 1))}
+                        className="px-3.5 py-2 text-sm font-semibold text-[#111827] hover:bg-[#EAEAEA] transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[#4B5563] block">
+                      Bid Price (Cut-off)
+                    </label>
+                    <div className="h-[38px] px-3 flex items-center justify-between bg-[#FAFAFA] border border-[#E5E7EB] rounded-lg text-sm tabular-nums">
+                      <span className="font-semibold text-[#111827]">
+                        ₹{basePrice || 'TBA'}
+                      </span>
+                      <span className="text-xs text-[#6B7280]">
+                        {lots * (ipo.lot_size || 1)} shares
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="ipo-pan-input" className="text-xs font-medium text-[#4B5563] block">
+                      PAN Number
+                    </label>
+                    <input
+                      id="ipo-pan-input"
+                      type="text"
+                      required
+                      maxLength={10}
+                      placeholder="ABCDE1234F"
+                      value={pan}
+                      onChange={(e) => setPan(e.target.value.toUpperCase())}
+                      className="w-full h-10 px-3 text-sm bg-white border border-[#E5E7EB] focus:border-[#111827] rounded-lg outline-none uppercase"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="ipo-upi-input" className="text-xs font-medium text-[#4B5563] block">
+                      UPI ID (for ASBA Mandate)
+                    </label>
+                    <input
+                      id="ipo-upi-input"
+                      type="text"
+                      required
+                      placeholder="yourname@okaxis"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      className="w-full h-10 px-3 text-sm bg-white border border-[#E5E7EB] focus:border-[#111827] rounded-lg outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg flex items-center justify-between text-sm tabular-nums">
+                  <div>
+                    <div className="text-xs text-[#4B5563]">Total Payable Amount</div>
+                    <div className="text-xs text-[#6B7280]">
+                      Blocked in bank via UPI mandate until allotment
+                    </div>
+                  </div>
+                  <div className="text-lg font-semibold text-[#111827]">
+                    ₹{((basePrice || 0) * lots * (ipo.lot_size || 1)).toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <div className="pt-1 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setApplyModalOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-[#4B5563] hover:text-[#111827] bg-white border border-[#E5E7EB] rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={applySubmitting}
+                    className="px-5 py-2 bg-[#111827] hover:bg-neutral-800 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {applySubmitting ? 'Submitting...' : 'Submit IPO Application'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

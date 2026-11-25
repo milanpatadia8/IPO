@@ -1,0 +1,358 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Registered IPO Insiders user profile with private email and role metadata",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified user email address",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name shown in header and admin directory",
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile avatar URL",
+          "maxLength": 500
+        },
+        "role": {
+          "type": "string",
+          "description": "Application role assigned to the user",
+          "enum": ["user", "admin"]
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether account access is active"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user profile was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when user profile was last updated"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "isActive", "createdAt", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted marker document designating a Firebase UID as an IPO Insiders administrator",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the administrator",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address of the administrator",
+          "maxLength": 254
+        },
+        "grantedBy": {
+          "type": "string",
+          "description": "UID of the administrator who granted access",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when admin access was granted"
+        }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    },
+    "IPORecord": {
+      "title": "IPORecord",
+      "description": "Complete Indian Mainboard or SME IPO offering record including GMP, subscription, and listing metrics",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique IPO document identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "company_id": {
+          "type": "string",
+          "description": "Associated company identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "company": {
+          "type": "object",
+          "description": "Embedded company metadata (name, slug, industry, description)"
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL-safe IPO slug",
+          "maxLength": 160,
+          "pattern": "^[a-z0-9\\-]+$"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Mainboard", "SME"]
+        },
+        "exchange": {
+          "type": "string",
+          "enum": ["NSE", "BSE", "NSE, BSE", "BSE SME", "NSE Emerge"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["upcoming", "ongoing", "closed", "listed", "postponed", "withdrawn"]
+        },
+        "announcement_status": {
+          "type": "string",
+          "enum": ["confirmed", "dates_announced", "expected", "awaiting_details", "postponed", "withdrawn"]
+        },
+        "visibility": {
+          "type": "string",
+          "description": "Member read visibility flag",
+          "enum": ["members"]
+        },
+        "open_date": { "type": "string", "maxLength": 32 },
+        "close_date": { "type": "string", "maxLength": 32 },
+        "allotment_date": { "type": "string", "maxLength": 32 },
+        "refund_date": { "type": "string", "maxLength": 32 },
+        "demat_credit_date": { "type": "string", "maxLength": 32 },
+        "listing_date": { "type": "string", "maxLength": 32 },
+        "price_band_min": { "type": "number" },
+        "price_band_max": { "type": "number" },
+        "issue_price": { "type": "number" },
+        "lot_size": { "type": "number" },
+        "issue_size": { "type": "number" },
+        "fresh_issue_size": { "type": "number" },
+        "offer_for_sale_size": { "type": "number" },
+        "retail_quota_percent": { "type": "number" },
+        "qib_quota_percent": { "type": "number" },
+        "nii_quota_percent": { "type": "number" },
+        "registrar_name": { "type": "string", "maxLength": 200 },
+        "registrar_url": { "type": "string", "maxLength": 500 },
+        "drhp_url": { "type": "string", "maxLength": 500 },
+        "rhp_url": { "type": "string", "maxLength": 500 },
+        "official_source_url": { "type": "string", "maxLength": 500 },
+        "data_verified_at": { "type": "string", "maxLength": 64 },
+        "published_at": { "type": "string", "maxLength": 64 },
+        "created_at": { "type": "string", "maxLength": 64 },
+        "updated_at": { "type": "string", "maxLength": 64 },
+        "latest_gmp": { "type": "object" },
+        "previous_gmp": { "type": "object" },
+        "gmp_history": { "type": "array" },
+        "latest_subscription": { "type": "object" },
+        "subscription_history": { "type": "array" },
+        "listing_result": { "type": "object" },
+        "important_dates": { "type": "array" },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "company_id",
+        "company",
+        "slug",
+        "category",
+        "exchange",
+        "status",
+        "announcement_status",
+        "visibility",
+        "created_at",
+        "updated_at",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AuditLogEntry": {
+      "title": "AuditLogEntry",
+      "description": "Immutable append-only administrative audit trail entry",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actor_id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actor_name": { "type": "string", "maxLength": 120 },
+        "action": { "type": "string", "maxLength": 80 },
+        "entity_type": { "type": "string", "maxLength": 60 },
+        "entity_id": { "type": "string", "maxLength": 128 },
+        "before_summary": { "type": "string", "maxLength": 1000 },
+        "after_summary": { "type": "string", "maxLength": 1000 },
+        "created_at": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "actor_id", "actor_name", "action", "entity_type", "entity_id", "created_at", "createdAt"]
+    },
+    "FeedRunEntry": {
+      "title": "FeedRunEntry",
+      "description": "Administrative data feed synchronization run log",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "source_id": { "type": "string", "maxLength": 128 },
+        "provider_name": { "type": "string", "maxLength": 150 },
+        "job_type": {
+          "type": "string",
+          "enum": ["ipo_discovery", "subscription_sync", "gmp_sync", "listing_sync", "csv_import"]
+        },
+        "started_at": { "type": "string", "maxLength": 64 },
+        "finished_at": { "type": "string", "maxLength": 64 },
+        "status": {
+          "type": "string",
+          "enum": ["running", "success", "partial", "failed"]
+        },
+        "records_fetched": { "type": "number" },
+        "records_accepted": { "type": "number" },
+        "records_rejected": { "type": "number" },
+        "created_at": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "provider_name",
+        "job_type",
+        "started_at",
+        "status",
+        "records_fetched",
+        "records_accepted",
+        "records_rejected",
+        "created_at",
+        "createdAt"
+      ]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global IPO Insiders configuration and seed state",
+      "type": "object",
+      "properties": {
+        "gmpStalenessHours": { "type": "number" },
+        "subStalenessHours": { "type": "number" },
+        "seeded": { "type": "boolean" },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["gmpStalenessHours", "subStalenessHours", "seeded", "updatedBy", "updatedAt"]
+    },
+    "IPOApplication": {
+      "title": "IPOApplication",
+      "description": "End-user IPO bid application submitted after login with private PAN and UPI details",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userEmail": { "type": "string", "format": "email", "maxLength": 254 },
+        "userName": { "type": "string", "maxLength": 120 },
+        "ipoId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ipoSlug": { "type": "string", "maxLength": 160, "pattern": "^[a-z0-9\\-]+$" },
+        "companyName": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "enum": ["Mainboard", "SME"] },
+        "investorCategory": { "type": "string", "enum": ["Retail", "sHNI", "bHNI"] },
+        "lots": { "type": "number" },
+        "shares": { "type": "number" },
+        "bidPrice": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "upiId": { "type": "string", "maxLength": 120 },
+        "pan": { "type": "string", "maxLength": 10, "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]{1}$" },
+        "status": { "type": "string", "enum": ["submitted", "cancelled"] },
+        "created_at": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "userId",
+        "userEmail",
+        "userName",
+        "ipoId",
+        "ipoSlug",
+        "companyName",
+        "category",
+        "investorCategory",
+        "lots",
+        "shares",
+        "bidPrice",
+        "totalAmount",
+        "upiId",
+        "pan",
+        "status",
+        "created_at",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profiles and role records"
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted admin role registry"
+    },
+    "/ipos/{ipoId}": {
+      "schema": { "$ref": "#/entities/IPORecord" },
+      "description": "Publicly readable, admin-managed Indian IPO catalog with GMP, subscription, and listing results"
+    },
+    "/ipo_applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/IPOApplication" },
+      "description": "Authenticated end-user IPO applications (strictly isolated by userId or admin)"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLogEntry" },
+      "description": "Immutable administrative audit logs"
+    },
+    "/feed_runs/{runId}": {
+      "schema": { "$ref": "#/entities/FeedRunEntry" },
+      "description": "Data ingestion feed run history"
+    },
+    "/app_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/AppSettings" },
+      "description": "Global application settings and staleness thresholds"
+    }
+  }
+}

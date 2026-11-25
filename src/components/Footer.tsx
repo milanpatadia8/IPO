@@ -1,16 +1,18 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
-import { AdminUser } from '../types/ipo';
+import { AppUserProfile } from '../lib/auth';
 
 interface FooterProps {
   navigate: (route: string) => void;
-  adminUser?: AdminUser | null;
+  userProfile?: AppUserProfile | null;
+  isAdmin?: boolean;
   onOpenAdminLogin: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   navigate,
-  adminUser,
+  userProfile,
+  isAdmin = false,
   onOpenAdminLogin,
 }) => {
   return (
@@ -72,10 +74,10 @@ export const Footer: React.FC<FooterProps> = ({
                 </li>
                 <li>
                   <button
-                    onClick={() => (adminUser ? navigate('/admin') : onOpenAdminLogin())}
+                    onClick={() => (isAdmin ? navigate('/admin') : onOpenAdminLogin())}
                     className="hover:text-[#111827] transition-colors"
                   >
-                    {adminUser ? 'Admin Console' : 'Admin Login'}
+                    {isAdmin ? 'Admin Console' : 'Login'}
                   </button>
                 </li>
               </ul>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LoginModal } from './components/LoginModal';
@@ -24,31 +24,47 @@ import { AdminFeedsPage } from './pages/admin/AdminFeedsPage';
 import { AdminImportsPage } from './pages/admin/AdminImportsPage';
 import { AdminAuditPage } from './pages/admin/AdminAuditPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
-import { AdminUser, IPO } from './types/ipo';
+import { IPO } from './types/ipo';
 import { api } from './lib/api';
+import { useAuth, AppUserProfile } from './lib/auth';
+import { ShieldAlert, LogOut, ArrowLeft, LogIn } from 'lucide-react';
 
 export function App() {
+  const { profile, adminUser, isSignedIn, isAdmin, authReady, signOut } = useAuth();
+
   const [currentRoute, setCurrentRoute] = useState<string>(() => {
     return window.location.pathname || '/';
   });
-  const [adminUser, setAdminUser] = useState<AdminUser | null>(() => {
-    try {
-      const saved = localStorage.getItem('ipo_tracker_admin_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
   const [adminTab, setAdminTab] = useState<string>('overview');
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
+  const [loginIntent, setLoginIntent] = useState<'user' | 'admin'>('user');
+  const [loginReason, setLoginReason] = useState<string | undefined>(undefined);
+  const pendingAfterLoginRef = useRef<(() => void) | null>(null);
+
   const [allotmentOpen, setAllotmentOpen] = useState<boolean>(false);
   const [allotmentSlug, setAllotmentSlug] = useState<string | undefined>(undefined);
   const [commandOpen, setCommandOpen] = useState<boolean>(false);
   const [allIpos, setAllIpos] = useState<IPO[]>([]);
+  const [seedVersion, setSeedVersion] = useState<number>(0);
 
+  // Seed Firestore automatically when an admin signs in for the first time
   useEffect(() => {
-    api.getAllIPOs().then(setAllIpos).catch(() => {});
-  }, [currentRoute]);
+    if (!authReady) return;
+    if (isAdmin && adminUser) {
+      api
+        .ensureSeededInFirestore(adminUser.id)
+        .then(() => setSeedVersion((v) => v + 1))
+        .catch((err) => console.error('Initial Firestore seed failed:', err));
+    }
+  }, [authReady, isAdmin, adminUser]);
+
+  // Load IPO catalog publicly without requiring login
+  useEffect(() => {
+    api
+      .getAllIPOs()
+      .then(setAllIpos)
+      .catch((err) => console.error('Failed to load IPOs:', err));
+  }, [currentRoute, seedVersion]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -70,8 +86,26 @@ export function App() {
 
   const navigate = (route: string) => {
     window.history.pushState({}, '', route);
-    setCurrentRoute(route);
+    const cleanPath = route.split('?')[0] || '/';
+    setCurrentRoute(cleanPath);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openLoginModal = (
+    intent: 'user' | 'admin' = 'user',
+    reason?: string,
+    onAfterLogin?: () => void
+  ) => {
+    setLoginIntent(intent);
+    setLoginReason(reason);
+    pendingAfterLoginRef.current = onAfterLogin || null;
+    setLoginModalOpen(true);
+  };
+
+  const handleCloseLoginModal = () => {
+    setLoginModalOpen(false);
+    setLoginReason(undefined);
+    pendingAfterLoginRef.current = null;
   };
 
   const openAllotment = (slug?: string) => {
@@ -79,41 +113,103 @@ export function App() {
     setAllotmentOpen(true);
   };
 
-  const handleAdminLoginSuccess = (user: AdminUser) => {
-    setAdminUser(user);
-    try {
-      localStorage.setItem('ipo_tracker_admin_user', JSON.stringify(user));
-    } catch (e) {
-      console.error(e);
+  const handleLoginSuccess = (
+    loggedInProfile: AppUserProfile,
+    chosenRole: 'user' | 'admin'
+  ) => {
+    const pending = pendingAfterLoginRef.current;
+    pendingAfterLoginRef.current = null;
+    setLoginReason(undefined);
+
+    if (chosenRole === 'admin' && loggedInProfile.role === 'admin') {
+      navigate('/admin');
+      return;
     }
-    navigate('/admin');
+
+    if (pending) {
+      pending();
+    }
   };
 
-  const handleAdminLogout = () => {
-    setAdminUser(null);
-    try {
-      localStorage.removeItem('ipo_tracker_admin_user');
-    } catch (e) {
-      console.error(e);
+  const handleSignOut = async () => {
+    await signOut();
+    if (currentRoute === '/admin' || currentRoute.startsWith('/admin/')) {
+      navigate('/');
     }
-    navigate('/');
   };
 
   const renderRoute = () => {
+    // Public disclosure / informational routes
+    if (currentRoute === '/about') {
+      return <AboutPage navigate={navigate} />;
+    }
+    if (currentRoute === '/disclaimer') {
+      return <DisclaimerPage navigate={navigate} />;
+    }
+    if (currentRoute === '/terms') {
+      return <TermsPage />;
+    }
+    if (currentRoute === '/privacy') {
+      return <PrivacyPage />;
+    }
+
+    // Protected Admin Console Route (Login required for Admin to edit backend details)
     if (currentRoute === '/admin' || currentRoute.startsWith('/admin/')) {
-      if (!adminUser) {
+      if (!authReady) {
+        return (
+          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#EAEAEA] rounded-xl text-center text-sm text-[#4B5563]">
+            Checking login session...
+          </div>
+        );
+      }
+
+      if (!isSignedIn) {
         return (
           <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#EAEAEA] rounded-xl text-center space-y-4">
-            <h2 className="text-lg font-semibold text-[#111827]">Protected Administrative Area</h2>
-            <p className="text-xs text-[#6B7280]">
-              Sign in with an authorized administrative profile to access the console.
+            <h2 className="text-lg font-semibold text-[#111827]">Admin Console</h2>
+            <p className="text-sm text-[#4B5563]">
+              Login with an authorized administrator account to edit IPO details, GMP quotes, subscriptions, and backend settings.
             </p>
             <button
-              onClick={() => setLoginModalOpen(true)}
-              className="px-4 py-2 bg-[#111827] text-white text-xs font-medium rounded-lg hover:bg-[#1F2937] transition-colors"
+              type="button"
+              onClick={() => openLoginModal('admin', 'Login with an authorized Admin account to edit backend details.')}
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-[#111827] text-white text-sm font-medium rounded-lg hover:bg-[#1F2937] transition-colors"
             >
-              Sign In to Admin Console
+              <LogIn className="w-4 h-4" />
+              <span>Login</span>
             </button>
+          </div>
+        );
+      }
+
+      if (!isAdmin || !adminUser) {
+        return (
+          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#EAEAEA] rounded-xl text-center space-y-4">
+            <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <h2 className="text-lg font-semibold text-[#111827]">Admin Access Required</h2>
+            <p className="text-sm text-[#4B5563] leading-relaxed">
+              You are logged in as <strong className="text-[#111827]">{profile?.email}</strong> with End User access. Only authorized administrators can edit backend IPO details.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#111827] text-white text-sm font-medium rounded-lg hover:bg-[#1F2937] transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>View IPOs</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openLoginModal('admin', 'Select an authorized Admin Google account to continue.')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-[#E5E7EB] text-[#4B5563] hover:text-[#111827] text-sm font-medium rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Switch Account</span>
+              </button>
+            </div>
           </div>
         );
       }
@@ -123,7 +219,7 @@ export function App() {
           currentAdminTab={adminTab}
           setAdminTab={setAdminTab}
           adminUser={adminUser}
-          onLogout={handleAdminLogout}
+          onLogout={handleSignOut}
           navigate={navigate}
         >
           {adminTab === 'overview' && (
@@ -140,6 +236,7 @@ export function App() {
       );
     }
 
+    // All IPO views are publicly accessible without login
     if (
       currentRoute.startsWith('/ipo/') &&
       currentRoute !== '/ipo/upcoming' &&
@@ -148,13 +245,29 @@ export function App() {
       currentRoute !== '/ipo/gmp'
     ) {
       const slug = currentRoute.replace('/ipo/', '');
-      return <IPODetailPage slug={slug} navigate={navigate} />;
+      return (
+        <IPODetailPage
+          slug={slug}
+          navigate={navigate}
+          onRequireLogin={(reason, onAfterLogin) =>
+            openLoginModal('user', reason, onAfterLogin)
+          }
+        />
+      );
     }
 
     if (currentRoute.startsWith('/ipo/ongoing')) {
       const urlParams = new URLSearchParams(window.location.search);
       const searchParam = urlParams.get('search') || '';
-      return <OngoingIPOsPage navigate={navigate} searchParam={searchParam} />;
+      return (
+        <OngoingIPOsPage
+          navigate={navigate}
+          searchParam={searchParam}
+          onRequireLogin={(reason, onAfterLogin) =>
+            openLoginModal('user', reason, onAfterLogin)
+          }
+        />
+      );
     }
 
     if (currentRoute === '/ipo/upcoming') {
@@ -173,19 +286,6 @@ export function App() {
       return <CalendarPage navigate={navigate} />;
     }
 
-    if (currentRoute === '/about') {
-      return <AboutPage navigate={navigate} />;
-    }
-    if (currentRoute === '/disclaimer') {
-      return <DisclaimerPage navigate={navigate} />;
-    }
-    if (currentRoute === '/terms') {
-      return <TermsPage />;
-    }
-    if (currentRoute === '/privacy') {
-      return <PrivacyPage />;
-    }
-
     return (
       <HomePage
         navigate={navigate}
@@ -199,30 +299,35 @@ export function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-[#111827] font-sans">
-      {!isAdminRoute && (
+      {!(isAdminRoute && isAdmin) && (
         <Header
           currentRoute={currentRoute}
           navigate={navigate}
-          adminUser={adminUser}
-          onOpenAdminLogin={() => setLoginModalOpen(true)}
+          userProfile={profile}
+          isAdmin={isAdmin}
+          onOpenLogin={() => openLoginModal('user')}
+          onSignOut={handleSignOut}
           onOpenAllotment={() => openAllotment(undefined)}
         />
       )}
 
       <main className="flex-1">{renderRoute()}</main>
 
-      {!isAdminRoute && (
+      {!(isAdminRoute && isAdmin) && (
         <Footer
           navigate={navigate}
-          adminUser={adminUser}
-          onOpenAdminLogin={() => setLoginModalOpen(true)}
+          userProfile={profile}
+          isAdmin={isAdmin}
+          onOpenAdminLogin={() => openLoginModal('admin')}
         />
       )}
 
       <LoginModal
         isOpen={loginModalOpen}
-        onClose={() => setLoginModalOpen(false)}
-        onSuccess={handleAdminLoginSuccess}
+        onClose={handleCloseLoginModal}
+        onSuccess={handleLoginSuccess}
+        intent={loginIntent}
+        reason={loginReason}
       />
 
       <AllotmentCheckerModal

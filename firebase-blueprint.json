@@ -22,6 +22,11 @@
           "description": "Display name shown in header and admin directory",
           "maxLength": 120
         },
+        "phone": {
+          "type": "string",
+          "description": "Optional normalized mobile number for mobile-based accounts",
+          "maxLength": 20
+        },
         "photoURL": {
           "type": "string",
           "description": "Profile avatar URL",
@@ -80,9 +85,44 @@
       },
       "required": ["uid", "email", "grantedBy", "createdAt"]
     },
+    "AuthorizedAdminRecord": {
+      "title": "AuthorizedAdminRecord",
+      "description": "Admin-authorized email allowlist entry granting Admin role access automatically on sign-in",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Sanitized lowercase email key",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Authorized admin email address",
+          "maxLength": 254
+        },
+        "added_by": {
+          "type": "string",
+          "description": "Identifier of the admin who authorized this email",
+          "maxLength": 254
+        },
+        "added_at": {
+          "type": "string",
+          "description": "ISO timestamp when email was authorized",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when email was authorized"
+        }
+      },
+      "required": ["id", "email", "added_by", "added_at", "createdAt"]
+    },
     "IPORecord": {
       "title": "IPORecord",
-      "description": "Complete Indian Mainboard or SME IPO offering record including GMP, subscription, and listing metrics",
+      "description": "Complete Indian Mainboard or SME IPO offering record including unlisted price, subscription, quotas, lot limits, and listing metrics",
       "type": "object",
       "properties": {
         "id": {
@@ -125,7 +165,7 @@
         },
         "visibility": {
           "type": "string",
-          "description": "Member read visibility flag",
+          "description": "Public catalog visibility flag",
           "enum": ["members"]
         },
         "open_date": { "type": "string", "maxLength": 32 },
@@ -144,11 +184,16 @@
         "retail_quota_percent": { "type": "number" },
         "qib_quota_percent": { "type": "number" },
         "nii_quota_percent": { "type": "number" },
-        "registrar_name": { "type": "string", "maxLength": 200 },
-        "registrar_url": { "type": "string", "maxLength": 500 },
-        "drhp_url": { "type": "string", "maxLength": 500 },
-        "rhp_url": { "type": "string", "maxLength": 500 },
-        "official_source_url": { "type": "string", "maxLength": 500 },
+        "employee_quota_percent": { "type": "number" },
+        "shareholder_quota_percent": { "type": "number" },
+        "other_quota_percent": { "type": "number" },
+        "category_lot_limits": { "type": "object" },
+        "min_investment_multiples": { "type": "object" },
+        "registrar_name": { "type": "string", "maxLength": 300 },
+        "registrar_url": { "type": "string", "maxLength": 2500 },
+        "drhp_url": { "type": "string", "maxLength": 2500 },
+        "rhp_url": { "type": "string", "maxLength": 2500 },
+        "official_source_url": { "type": "string", "maxLength": 2500 },
         "data_verified_at": { "type": "string", "maxLength": 64 },
         "published_at": { "type": "string", "maxLength": 64 },
         "created_at": { "type": "string", "maxLength": 64 },
@@ -178,6 +223,66 @@
         "status",
         "announcement_status",
         "visibility",
+        "created_at",
+        "updated_at",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ClientRecord": {
+      "title": "ClientRecord",
+      "description": "Admin-managed private client profile and advisory fee payment ledger",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "full_name": { "type": "string", "maxLength": 200 },
+        "email": { "type": "string", "maxLength": 254 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "pan": { "type": "string", "maxLength": 20 },
+        "demat_id": { "type": "string", "maxLength": 64 },
+        "client_code": { "type": "string", "maxLength": 64 },
+        "service_plan": { "type": "string", "maxLength": 200 },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive", "lead", "suspended"]
+        },
+        "total_fee_agreed": { "type": "number" },
+        "total_fee_paid": { "type": "number" },
+        "balance_due": { "type": "number" },
+        "fee_status": {
+          "type": "string",
+          "enum": ["paid", "partial", "pending", "waived"]
+        },
+        "fee_waived": { "type": "boolean" },
+        "fee_due_date": { "type": "string", "maxLength": 32 },
+        "payments": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 5000 },
+        "joined_date": { "type": "string", "maxLength": 32 },
+        "created_at": { "type": "string", "maxLength": 64 },
+        "updated_at": { "type": "string", "maxLength": 64 },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "full_name",
+        "status",
+        "total_fee_agreed",
+        "total_fee_paid",
+        "balance_due",
+        "fee_status",
+        "payments",
+        "joined_date",
         "created_at",
         "updated_at",
         "updatedBy",
@@ -260,6 +365,7 @@
         "gmpStalenessHours": { "type": "number" },
         "subStalenessHours": { "type": "number" },
         "seeded": { "type": "boolean" },
+        "policiesCustomized": { "type": "boolean" },
         "updatedBy": {
           "type": "string",
           "maxLength": 128,
@@ -268,6 +374,118 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["gmpStalenessHours", "subStalenessHours", "seeded", "updatedBy", "updatedAt"]
+    },
+    "SitePolicyDocument": {
+      "title": "SitePolicyDocument",
+      "description": "Admin-managed Terms, Privacy Policy, SEBI Disclaimers, Methodology, and custom disclosure pages",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "slug": {
+          "type": "string",
+          "maxLength": 100,
+          "pattern": "^[a-z0-9\\-]+$"
+        },
+        "title": { "type": "string", "maxLength": 300 },
+        "subtitle": { "type": "string", "maxLength": 500 },
+        "category": {
+          "type": "string",
+          "enum": ["disclaimer", "terms", "privacy", "policy", "disclosure"]
+        },
+        "footer_summary": { "type": "string", "maxLength": 6000 },
+        "show_in_footer_links": { "type": "boolean" },
+        "show_in_footer_banner": { "type": "boolean" },
+        "sort_order": { "type": "number" },
+        "sections": { "type": "array" },
+        "visibility": {
+          "type": "string",
+          "enum": ["public"]
+        },
+        "created_at": { "type": "string", "maxLength": 64 },
+        "updated_at": { "type": "string", "maxLength": 64 },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "slug",
+        "title",
+        "category",
+        "show_in_footer_links",
+        "show_in_footer_banner",
+        "sort_order",
+        "sections",
+        "visibility",
+        "created_at",
+        "updated_at",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SitePageContent": {
+      "title": "SitePageContent",
+      "description": "Admin-editable copy, headings, button labels, banners, and custom content blocks for any public page of the website",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z0-9_\\-]+$"
+        },
+        "page_key": {
+          "type": "string",
+          "enum": ["site_chrome", "home", "ongoing", "upcoming", "unlisted_price", "listed", "calendar", "ipo_detail"]
+        },
+        "page_label": { "type": "string", "maxLength": 200 },
+        "route_path": { "type": "string", "maxLength": 120 },
+        "eyebrow": { "type": "string", "maxLength": 250 },
+        "title": { "type": "string", "maxLength": 300 },
+        "subtitle": { "type": "string", "maxLength": 2000 },
+        "primary_cta_label": { "type": "string", "maxLength": 120 },
+        "secondary_cta_label": { "type": "string", "maxLength": 120 },
+        "notice_banner_title": { "type": "string", "maxLength": 300 },
+        "notice_banner_body": { "type": "string", "maxLength": 5000 },
+        "custom_fields": { "type": "object" },
+        "extra_sections": { "type": "array" },
+        "visibility": {
+          "type": "string",
+          "enum": ["public"]
+        },
+        "created_at": { "type": "string", "maxLength": 64 },
+        "updated_at": { "type": "string", "maxLength": 64 },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "page_key",
+        "page_label",
+        "route_path",
+        "title",
+        "custom_fields",
+        "extra_sections",
+        "visibility",
+        "created_at",
+        "updated_at",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "IPOApplication": {
       "title": "IPOApplication",
@@ -290,7 +508,7 @@
         "ipoSlug": { "type": "string", "maxLength": 160, "pattern": "^[a-z0-9\\-]+$" },
         "companyName": { "type": "string", "maxLength": 200 },
         "category": { "type": "string", "enum": ["Mainboard", "SME"] },
-        "investorCategory": { "type": "string", "enum": ["Retail", "sHNI", "bHNI"] },
+        "investorCategory": { "type": "string", "enum": ["Retail", "Employee", "Shareholder", "sHNI", "bHNI", "QIB"] },
         "lots": { "type": "number" },
         "shares": { "type": "number" },
         "bidPrice": { "type": "number" },
@@ -334,9 +552,25 @@
       "schema": { "$ref": "#/entities/AdminRecord" },
       "description": "Trusted admin role registry"
     },
+    "/authorized_admins/{emailKey}": {
+      "schema": { "$ref": "#/entities/AuthorizedAdminRecord" },
+      "description": "Admin-authorized email allowlist granting Admin access automatically on sign-in"
+    },
     "/ipos/{ipoId}": {
       "schema": { "$ref": "#/entities/IPORecord" },
-      "description": "Publicly readable, admin-managed Indian IPO catalog with GMP, subscription, and listing results"
+      "description": "Publicly readable, admin-managed Indian IPO catalog with unlisted price, subscription, quotas, lot limits, and listing results"
+    },
+    "/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/ClientRecord" },
+      "description": "Admin-only private client directory and fee payment ledger"
+    },
+    "/site_policies/{policyId}": {
+      "schema": { "$ref": "#/entities/SitePolicyDocument" },
+      "description": "Publicly readable, admin-managed terms of use, privacy policy, SEBI disclaimers, and disclosure pages"
+    },
+    "/site_pages/{pageId}": {
+      "schema": { "$ref": "#/entities/SitePageContent" },
+      "description": "Publicly readable, admin-managed page headings, labels, notices, and custom sections for all website pages"
     },
     "/ipo_applications/{applicationId}": {
       "schema": { "$ref": "#/entities/IPOApplication" },

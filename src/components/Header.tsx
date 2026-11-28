@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Menu, X, LogOut, Shield, LogIn } from 'lucide-react';
-import { AppUserProfile } from '../lib/auth';
+import { Menu, X, LogOut, Shield, LogIn, UserPen } from 'lucide-react';
+import { AppUserProfile, formatUserContact } from '../lib/auth';
+import { useSitePageContent } from '../lib/siteContent';
 
 interface HeaderProps {
   currentRoute: string;
@@ -8,6 +9,7 @@ interface HeaderProps {
   userProfile?: AppUserProfile | null;
   isAdmin?: boolean;
   onOpenLogin: () => void;
+  onOpenProfile: () => void;
   onSignOut: () => void;
   onOpenAllotment: () => void;
 }
@@ -18,10 +20,15 @@ export const Header: React.FC<HeaderProps> = ({
   userProfile,
   isAdmin = false,
   onOpenLogin,
+  onOpenProfile,
   onSignOut,
   onOpenAllotment,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const chrome = useSitePageContent('site_chrome');
+  const brandName = chrome.title || 'IPO Insiders';
+  const allotmentBtnLabel = chrome.primary_cta_label || 'Check Allotment';
+  const loginBtnLabel = chrome.secondary_cta_label || 'Login';
 
   const handleNav = (route: string) => {
     navigate(route);
@@ -29,27 +36,30 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const navLinks = [
-    { label: 'Open', route: '/ipo/ongoing' },
-    { label: 'Upcoming', route: '/ipo/upcoming' },
-    { label: 'GMP', route: '/ipo/gmp' },
-    { label: 'Listed', route: '/ipo/listed' },
+    { label: chrome.custom_fields.nav_ongoing || 'Open', route: '/ipo/ongoing' },
+    { label: chrome.custom_fields.nav_upcoming || 'Upcoming', route: '/ipo/upcoming' },
+    { label: chrome.custom_fields.nav_unlisted || 'Unlisted Price', route: '/ipo/unlisted-price' },
+    { label: chrome.custom_fields.nav_listed || 'Listed', route: '/ipo/listed' },
   ];
 
+  const userInitial = (userProfile?.displayName || 'U').trim().charAt(0).toUpperCase();
+
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-xs border-b border-[#EAEAEA]">
+    <header className="sticky top-0 z-40 bg-[#FAF8F4]/95 backdrop-blur-xs border-b border-[#E6DFD3]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-6 h-16">
           {/* Zone 1: Brand Wordmark */}
           <button
             type="button"
             onClick={() => handleNav('/')}
-            className="text-lg font-semibold tracking-tight text-[#111827] hover:opacity-80 transition-opacity whitespace-nowrap shrink-0"
+            className="flex items-center gap-2 text-lg font-display font-bold tracking-tight text-[#1C1917] hover:text-[#14532D] transition-colors whitespace-nowrap shrink-0"
           >
-            IPO Insiders
+            <span className="w-2.5 h-2.5 rounded-xs bg-[#14532D] ring-2 ring-[#E8D5B0]" />
+            <span>{brandName}</span>
           </button>
 
           {/* Zone 2: Navigation links */}
-          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-[#4B5563]">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-[#57534E]">
             {navLinks.map((link) => {
               const isActive =
                 currentRoute === link.route || currentRoute.startsWith(link.route + '/');
@@ -58,8 +68,10 @@ export const Header: React.FC<HeaderProps> = ({
                   key={link.route}
                   type="button"
                   onClick={() => handleNav(link.route)}
-                  className={`transition-colors whitespace-nowrap shrink-0 hover:text-[#111827] hover:underline underline-offset-4 ${
-                    isActive ? 'text-[#111827] font-semibold' : ''
+                  className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
+                    isActive
+                      ? 'text-[#14532D] font-semibold border-[#14532D]'
+                      : 'border-transparent hover:text-[#1C1917] hover:border-[#D6C7B2]'
                   }`}
                 >
                   {link.label}
@@ -74,7 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={() => handleNav('/admin')}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#111827] bg-[#F3F4F6] hover:bg-[#E5E7EB] border border-[#E5E7EB] rounded-lg transition-colors whitespace-nowrap shrink-0"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-[#14532D] bg-[#EEF6F0] hover:bg-[#E0EFE4] border border-[#C6E2CE] rounded-lg transition-colors whitespace-nowrap shrink-0"
               >
                 <Shield className="w-4 h-4" />
                 <span>Admin</span>
@@ -84,21 +96,40 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenAllotment}
-              className="hidden sm:inline-flex items-center justify-center px-3.5 py-2 text-sm font-medium text-[#111827] bg-white hover:bg-[#FAFAFA] border border-[#E5E7EB] rounded-lg transition-colors whitespace-nowrap shrink-0"
+              className="hidden sm:inline-flex items-center justify-center px-3.5 py-2 text-sm font-medium text-[#1C1917] bg-white hover:bg-[#FAF4E8] border border-[#DFD6C7] rounded-lg transition-colors whitespace-nowrap shrink-0"
             >
-              Check Allotment
+              {allotmentBtnLabel}
             </button>
 
             {userProfile ? (
-              <div className="hidden sm:flex items-center gap-2 pl-2 ml-0.5 border-l border-[#EAEAEA]">
-                <span className="text-sm font-medium text-[#111827] max-w-[120px] truncate">
-                  {userProfile.displayName.split(' ')[0]}
-                </span>
+              <div className="hidden sm:flex items-center gap-1.5 pl-2.5 ml-0.5 border-l border-[#E6DFD3]">
+                <button
+                  type="button"
+                  onClick={onOpenProfile}
+                  title="Edit your profile"
+                  className="inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium text-[#1C1917] bg-white hover:bg-[#FAF4E8] border border-[#E6DFD3] rounded-lg transition-colors whitespace-nowrap shrink-0"
+                >
+                  {userProfile.photoURL ? (
+                    <img
+                      src={userProfile.photoURL}
+                      alt={userProfile.displayName}
+                      className="w-5 h-5 rounded-sm object-cover"
+                    />
+                  ) : (
+                    <span className="w-5 h-5 rounded-sm bg-[#14532D] text-[#FAF7F1] text-[11px] font-semibold flex items-center justify-center">
+                      {userInitial}
+                    </span>
+                  )}
+                  <span className="max-w-[110px] truncate">
+                    {userProfile.displayName.split(' ')[0]}
+                  </span>
+                  <UserPen className="w-3.5 h-3.5 text-[#78716C]" />
+                </button>
                 <button
                   type="button"
                   onClick={onSignOut}
-                  title={`Logout (${userProfile.email})`}
-                  className="p-2 text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6] rounded-lg transition-colors"
+                  title={`Logout (${formatUserContact(userProfile.email, userProfile.phone)})`}
+                  className="p-2 text-[#78716C] hover:text-[#1C1917] hover:bg-[#EFEAE0] rounded-lg transition-colors"
                   aria-label="Logout"
                 >
                   <LogOut className="w-4 h-4" />
@@ -108,17 +139,17 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 type="button"
                 onClick={onOpenLogin}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#111827] hover:bg-[#1F2937] rounded-lg transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#14532D] hover:bg-[#0F3F22] rounded-lg transition-colors whitespace-nowrap shrink-0"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Login</span>
+                <span>{loginBtnLabel}</span>
               </button>
             )}
 
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-[#4B5563] hover:text-[#111827] rounded-lg"
+              className="md:hidden p-2 text-[#57534E] hover:text-[#1C1917] rounded-lg"
               aria-label="Toggle navigation"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -128,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Mobile Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#EAEAEA] py-3 space-y-2.5">
+          <div className="md:hidden border-t border-[#E6DFD3] py-3 space-y-2.5">
             <div className="grid grid-cols-2 gap-1.5">
               {navLinks.map((link) => (
                 <button
@@ -137,8 +168,8 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => handleNav(link.route)}
                   className={`text-left px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                     currentRoute === link.route
-                      ? 'bg-[#F3F4F6] text-[#111827]'
-                      : 'text-[#4B5563] hover:bg-[#FAFAFA] hover:text-[#111827]'
+                      ? 'bg-[#EEF6F0] text-[#14532D]'
+                      : 'text-[#57534E] hover:bg-[#F2ECE1] hover:text-[#1C1917]'
                   }`}
                 >
                   {link.label}
@@ -148,37 +179,47 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => handleNav('/admin')}
-                  className="text-left px-3 py-2.5 text-sm font-medium rounded-lg text-[#111827] bg-[#F3F4F6]"
+                  className="text-left px-3 py-2.5 text-sm font-medium rounded-lg text-[#14532D] bg-[#EEF6F0] border border-[#C6E2CE]"
                 >
                   Admin Console
                 </button>
               )}
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-[#EAEAEA]">
+            <div className="space-y-2 pt-2 border-t border-[#E6DFD3]">
               <button
                 type="button"
                 onClick={() => {
                   setMobileMenuOpen(false);
                   onOpenAllotment();
                 }}
-                className="w-full py-2.5 text-sm font-medium text-[#111827] bg-white border border-[#E5E7EB] rounded-lg"
+                className="w-full py-2.5 text-sm font-medium text-[#1C1917] bg-white border border-[#DFD6C7] rounded-lg"
               >
-                Check Allotment
+                {allotmentBtnLabel}
               </button>
 
               {userProfile ? (
-                <div className="flex items-center justify-between px-1 pt-1 text-xs text-[#4B5563]">
-                  <span className="truncate font-medium text-[#111827]">
-                    {userProfile.displayName} ({isAdmin ? 'Admin' : 'End User'})
-                  </span>
+                <div className="flex items-center justify-between gap-2 px-1 pt-1 text-xs text-[#57534E]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenProfile();
+                    }}
+                    className="inline-flex items-center gap-1.5 truncate font-medium text-[#1C1917] hover:text-[#14532D]"
+                  >
+                    <UserPen className="w-3.5 h-3.5 text-[#14532D] shrink-0" />
+                    <span className="truncate">
+                      {userProfile.displayName} · Edit Profile
+                    </span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
                       setMobileMenuOpen(false);
                       onSignOut();
                     }}
-                    className="text-[#DC2626] font-medium hover:underline"
+                    className="text-[#B91C1C] font-medium hover:underline shrink-0"
                   >
                     Logout
                   </button>
@@ -190,9 +231,9 @@ export const Header: React.FC<HeaderProps> = ({
                     setMobileMenuOpen(false);
                     onOpenLogin();
                   }}
-                  className="w-full py-2.5 text-sm font-medium text-white bg-[#111827] rounded-lg"
+                  className="w-full py-2.5 text-sm font-medium text-white bg-[#14532D] rounded-lg"
                 >
-                  Login
+                  {loginBtnLabel}
                 </button>
               )}
             </div>

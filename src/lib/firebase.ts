@@ -5,6 +5,14 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 export const BOOTSTRAP_ADMIN_EMAIL = 'milanpatadia8@gmail.com';
 
+export function toAuthorizedAdminKey(email: string): string {
+  return email
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '_')
+    .slice(0, 128);
+}
+
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
@@ -24,6 +32,7 @@ export interface FirestoreErrorInfo {
   error: string;
   operationType: OperationType;
   path: string | null;
+  details?: Record<string, unknown>;
   authInfo: {
     userId?: string | null;
     email?: string | null;
@@ -40,7 +49,8 @@ export interface FirestoreErrorInfo {
 export function handleFirestoreError(
   error: unknown,
   operationType: OperationType,
-  path: string | null
+  path: string | null,
+  details?: Record<string, unknown>
 ): never {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -58,6 +68,7 @@ export function handleFirestoreError(
     },
     operationType,
     path,
+    ...(details ? { details } : {}),
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));

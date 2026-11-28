@@ -1,6 +1,6 @@
 // =====================================================================
-// In-Memory & Persistent Application Data Store: src/lib/store.ts
-// Compliant with PostgreSQL schema, RLS simulation, and audit logging
+// In-Memory Application Data Store: src/lib/store.ts
+// Starts clean with zero pre-seeded/demo IPO records for production publishing
 // =====================================================================
 
 import {
@@ -18,349 +18,102 @@ import {
   IPOExchange,
   IPOStatus,
   AnnouncementStatus,
+  CategoryLotLimitsMap,
+  MinInvestmentMultiples,
+  ClientRecord,
+  ClientFeePayment,
+  ClientStatus,
+  FeePaymentStatus,
+  PaymentMode,
 } from '../types/ipo';
 import {
   calculateListingGainPercentage,
   calculateIndicativeGainPercentage,
+  deriveIPOStatusFromDates,
   getValidDocUrl,
-  SEBI_PUBLIC_ISSUES_URL,
+  INVESTOR_LOT_CATEGORIES,
 } from './calculations';
 
-// Initial Companies
-const INITIAL_COMPANIES: Company[] = [
-  {
-    id: '33333333-3333-3333-3333-333333330001',
-    name: 'Waaree Energies Limited',
-    slug: 'waaree-energies',
-    description: 'India largest manufacturer of solar PV modules with aggregate installed capacity of 12 GW.',
-    industry: 'Solar & Renewable Energy',
-    website_url: 'https://www.waaree.com',
-    logo_url: '',
-    created_at: '2024-10-01T10:00:00Z',
-    updated_at: '2024-10-01T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330002',
-    name: 'Bajaj Housing Finance Limited',
-    slug: 'bajaj-housing-finance',
-    description: 'Non-deposit-taking Housing Finance Company (HFC) registered with NHB and RBI.',
-    industry: 'Financial Services / NBFC',
-    website_url: 'https://www.bajajhousingfinance.in',
-    logo_url: '',
-    created_at: '2024-09-01T10:00:00Z',
-    updated_at: '2024-09-01T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330003',
-    name: 'Premier Energies Limited',
-    slug: 'premier-energies',
-    description: 'Integrated solar cell and module manufacturing company in India with 25+ years track record.',
-    industry: 'Solar Technology',
-    website_url: 'https://www.premierenergies.com',
-    logo_url: '',
-    created_at: '2024-08-15T10:00:00Z',
-    updated_at: '2024-08-15T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330004',
-    name: 'Hyundai Motor India Limited',
-    slug: 'hyundai-motor-india',
-    description: 'Second largest passenger vehicle manufacturer in India with iconic models like Creta & Venue.',
-    industry: 'Automobile Manufacturing',
-    website_url: 'https://www.hyundai.com/in',
-    logo_url: '',
-    created_at: '2024-10-01T10:00:00Z',
-    updated_at: '2024-10-01T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330005',
-    name: 'Swiggy Limited',
-    slug: 'swiggy',
-    description: 'Pioneer consumer-tech on-demand platform offering food delivery and quick commerce (Instamart).',
-    industry: 'Consumer Tech / Logistics',
-    website_url: 'https://www.swiggy.com',
-    logo_url: '',
-    created_at: '2024-10-20T10:00:00Z',
-    updated_at: '2024-10-20T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330006',
-    name: 'NTPC Green Energy Limited',
-    slug: 'ntpc-green-energy',
-    description: 'Wholly owned subsidiary of NTPC Limited driving renewable energy portfolio development.',
-    industry: 'Renewable Power Generation',
-    website_url: 'https://www.ngel.in',
-    logo_url: '',
-    created_at: '2024-11-01T10:00:00Z',
-    updated_at: '2024-11-01T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330007',
-    name: 'Enviro Infra Engineers Limited',
-    slug: 'enviro-infra-engineers',
-    description: 'Designs and builds Sewage Treatment Plants (STPs) and Water Supply Projects (WSPs) for municipal corporations.',
-    industry: 'Infrastructure & Environmental Utilities',
-    website_url: 'https://www.eiel.in',
-    logo_url: '',
-    created_at: '2024-11-15T10:00:00Z',
-    updated_at: '2024-11-15T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330008',
-    name: 'Rajputana Biodiesel Limited',
-    slug: 'rajputana-biodiesel',
-    description: 'Manufacturer of biofuels, crude glycerine, and distilled fatty acids operating in Phulera, Rajasthan.',
-    industry: 'Biofuels & Green Chemicals',
-    website_url: 'https://www.rajputanabiodiesel.com',
-    logo_url: '',
-    created_at: '2024-11-15T10:00:00Z',
-    updated_at: '2024-11-15T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330009',
-    name: 'Suraksha Diagnostic Limited',
-    slug: 'suraksha-diagnostic',
-    description: 'Leading medical diagnostics network with extensive pathology and radiology center network across Eastern India.',
-    industry: 'Healthcare & Medical Diagnostics',
-    website_url: 'https://www.surakshanet.com',
-    logo_url: '',
-    created_at: '2024-11-10T10:00:00Z',
-    updated_at: '2024-11-10T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330010',
-    name: 'Vishal Mega Mart Limited',
-    slug: 'vishal-mega-mart',
-    description: 'Leading value-fashion and grocery retail chain with 645+ hypermarket format stores across 414 Indian cities.',
-    industry: 'Apparel & Grocery Retail',
-    website_url: 'https://www.vishalmegamart.com',
-    logo_url: '',
-    created_at: '2024-11-12T10:00:00Z',
-    updated_at: '2024-11-12T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330011',
-    name: 'Hexaware Technologies Limited',
-    slug: 'hexaware-technologies',
-    description: 'Global IT automation and next-generation cloud services powerhouse returning to public markets.',
-    industry: 'Enterprise Software & IT Services',
-    website_url: 'https://www.hexaware.com',
-    logo_url: '',
-    created_at: '2024-11-01T10:00:00Z',
-    updated_at: '2024-11-01T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330012',
-    name: 'Ganesh Green Bharat Limited',
-    slug: 'ganesh-green-bharat',
-    description: 'Premier solar EPC player supplying solar submersible pump systems and decentralized electrical infrastructure.',
-    industry: 'SME CleanTech & Solar EPC',
-    website_url: 'https://www.ganeshgreen.com',
-    logo_url: '',
-    created_at: '2024-07-01T10:00:00Z',
-    updated_at: '2024-07-01T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330013',
-    name: 'Ventive Hospitality Limited',
-    slug: 'ventive-hospitality',
-    description: 'Luxury hospitality owner-developer jointly held by Panchshil and Blackstone, operating marquee assets like JW Marriott, Ritz-Carlton Pune, and Conrad Pune.',
-    industry: 'Luxury Hospitality & Resorts',
-    website_url: 'https://www.ventivehospitality.com',
-    logo_url: '',
-    created_at: '2024-11-20T10:00:00Z',
-    updated_at: '2024-11-20T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330014',
-    name: 'Senores Pharmaceuticals Limited',
-    slug: 'senores-pharmaceuticals',
-    description: 'Research-driven specialty pharmaceutical company commercializing complex ANDAs, sterile injectables, and generic formulations in the United States and Canada.',
-    industry: 'Pharmaceuticals & Life Sciences',
-    website_url: 'https://www.senorespharma.com',
-    logo_url: '',
-    created_at: '2024-11-20T10:00:00Z',
-    updated_at: '2024-11-20T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330015',
-    name: 'Carraro India Limited',
-    slug: 'carraro-india',
-    description: 'Indian division of Carraro Group, manufacturing precision transmission systems, driveline axles, and gear sets for agricultural tractors and heavy construction machinery.',
-    industry: 'Automotive & Heavy Equipment Components',
-    website_url: 'https://www.carraro.com/en/carraro-india',
-    logo_url: '',
-    created_at: '2024-11-22T10:00:00Z',
-    updated_at: '2024-11-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330016',
-    name: 'Unimech Aerospace and Manufacturing Limited',
-    slug: 'unimech-aerospace',
-    description: 'High-precision engineering and aerospace tooling enterprise supplying complex mechanical assemblies and ground support tooling to global aerospace OEMs.',
-    industry: 'Aerospace & Defence Manufacturing',
-    website_url: 'https://www.unimechaerospace.com',
-    logo_url: '',
-    created_at: '2024-11-22T10:00:00Z',
-    updated_at: '2024-11-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330017',
-    name: 'Indo Farm Equipment Limited',
-    slug: 'indo-farm-equipment',
-    description: 'Renowned manufacturer of world-class agricultural tractors, mobile pick-and-carry cranes, harvester combines, and heavy diesel generator sets.',
-    industry: 'Agricultural & Farm Mechanization',
-    website_url: 'https://www.indofarm.in',
-    logo_url: '',
-    created_at: '2024-11-25T10:00:00Z',
-    updated_at: '2024-11-25T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330018',
-    name: 'Mamata Machinery Limited',
-    slug: 'mamata-machinery',
-    description: 'Pioneering global packaging machinery manufacturer offering high-speed automated pouch-making, bag-making, and robotic packaging lines installed in 85+ countries.',
-    industry: 'Industrial Packaging Automation',
-    website_url: 'https://www.mamata.com',
-    logo_url: '',
-    created_at: '2024-11-25T10:00:00Z',
-    updated_at: '2024-11-25T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330019',
-    name: 'DAM Capital Advisors Limited',
-    slug: 'dam-capital-advisors',
-    description: 'Prominent domestic institutional equities, investment banking, and capital advisory platform spearheading benchmark marquee transactions.',
-    industry: 'Investment Banking & Capital Markets',
-    website_url: 'https://www.damcapital.in',
-    logo_url: '',
-    created_at: '2024-11-26T10:00:00Z',
-    updated_at: '2024-11-26T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330020',
-    name: 'Jio Platforms Limited',
-    slug: 'jio-platforms',
-    description: 'Digital and telecom flagship subsidiary of Reliance Industries Limited powering India largest digital ecosystem (Jio Infocomm, 5G, cloud services, and digital media) with 490+ million active subscribers.',
-    industry: 'Telecom, 5G & Digital Platforms',
-    website_url: 'https://www.jio.com',
-    logo_url: '',
-    created_at: '2026-10-01T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330021',
-    name: 'Paras Healthcare Limited',
-    slug: 'paras-healthcare',
-    description: 'Leading healthcare provider operating network of super-specialty hospitals delivering oncology, cardiac, neurosciences, and tertiary care across North and Eastern India.',
-    industry: 'Healthcare & Hospital Chains',
-    website_url: 'https://www.parashospitals.com',
-    logo_url: '',
-    created_at: '2026-10-05T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330022',
-    name: 'Acme India Industries Limited',
-    slug: 'acme-india-industries',
-    description: 'Industrial engineering powerhouse manufacturing heavy process machinery, specialized fabrication, and automated manufacturing systems.',
-    industry: 'Industrial Machinery & Equipment',
-    website_url: 'https://www.acmeindia.com',
-    logo_url: '',
-    created_at: '2026-10-05T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330023',
-    name: 'HD Fire Protect Limited',
-    slug: 'hd-fire-protect',
-    description: 'Premier manufacturer and exporter of heavy-duty fire protection equipment, automatic foam deluge systems, and industrial safety valves exported to 75+ countries.',
-    industry: 'Fire Protection & Safety Equipment',
-    website_url: 'https://www.hdfire.com',
-    logo_url: '',
-    created_at: '2026-09-15T10:00:00Z',
-    updated_at: '2026-10-20T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330024',
-    name: 'Bonfiglioli Transmissions Limited',
-    slug: 'bonfiglioli-transmissions',
-    description: 'Leading global provider of gearmotors, drive systems, and planetary gearboxes serving industrial and mobile machinery applications across India and worldwide.',
-    industry: 'Industrial Gearmotors & Power Transmission',
-    website_url: 'https://www.bonfiglioli.com/india/en',
-    logo_url: '',
-    created_at: '2026-10-01T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330025',
-    name: 'Tonbo Imaging Limited',
-    slug: 'tonbo-imaging',
-    description: 'Pioneering deep-tech electro-optics and defense technology company designing military-grade AI vision, thermal imaging, and fire control systems.',
-    industry: 'Defense Tech & Electro-Optics',
-    website_url: 'https://www.tonboimaging.com',
-    logo_url: '',
-    created_at: '2026-10-01T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330026',
-    name: 'SFC Environmental Technologies Limited',
-    slug: 'sfc-environmental',
-    description: 'Cutting-edge environmental and wastewater engineering enterprise specializing in advanced biological wastewater treatment and nutrient recovery plants.',
-    industry: 'Water & Wastewater CleanTech',
-    website_url: 'https://www.sfctech.com',
-    logo_url: '',
-    created_at: '2026-10-10T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330027',
-    name: 'BLS Polymers Limited',
-    slug: 'bls-polymers',
-    description: 'Specialty chemical and polymer manufacturing company producing high-performance polymer masterbatches and custom engineering plastics compounds.',
-    industry: 'Specialty Polymers & Masterbatches',
-    website_url: 'https://www.blspolymers.com',
-    logo_url: '',
-    created_at: '2026-10-10T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330028',
-    name: 'Danish Power Limited',
-    slug: 'danish-power',
-    description: 'Premier manufacturer of power & distribution transformers, inverter duty transformers for solar plants, and substations powering India green grid expansion.',
-    industry: 'Power Transformers & Green Grid Equipment',
-    website_url: 'https://www.danish.co.in',
-    logo_url: '',
-    created_at: '2026-10-01T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330029',
-    name: 'United Heat Transfer Limited',
-    slug: 'united-heat-transfer',
-    description: 'Precision engineering manufacturer of shell and tube heat exchangers, moisture separators, and pressure vessels for marine and oil & gas sectors.',
-    industry: 'Heat Exchangers & Heavy Engineering',
-    website_url: 'https://www.uhtl.in',
-    logo_url: '',
-    created_at: '2026-10-05T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-  {
-    id: '33333333-3333-3333-3333-333333330030',
-    name: 'Deepak Builders & Engineers Limited',
-    slug: 'deepak-builders',
-    description: 'Integrated engineering and infrastructure construction company executing hospital complexes, administrative buildings, flyovers, and railway projects.',
-    industry: 'Infrastructure & EPC Construction',
-    website_url: 'https://www.deepakbuilders.in',
-    logo_url: '',
-    created_at: '2026-10-01T10:00:00Z',
-    updated_at: '2026-10-22T10:00:00Z',
-  },
-];
+function sanitizeQuotaPercent(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0 || num > 100) return undefined;
+  return Number(num.toFixed(2));
+}
 
-// Initial Data Sources
+function sanitizeCategoryLotLimits(raw: unknown): CategoryLotLimitsMap | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, { min_lots?: unknown; max_lots?: unknown } | null | undefined>;
+  const cleaned: CategoryLotLimitsMap = {};
+  let hasAny = false;
+
+  for (const cat of INVESTOR_LOT_CATEGORIES) {
+    const entry = input[cat];
+    if (!entry || typeof entry !== 'object') continue;
+    const minRaw =
+      entry.min_lots !== undefined && entry.min_lots !== null && entry.min_lots !== ''
+        ? Number(entry.min_lots)
+        : undefined;
+    const maxRaw =
+      entry.max_lots !== undefined && entry.max_lots !== null && entry.max_lots !== ''
+        ? Number(entry.max_lots)
+        : undefined;
+    const minLots =
+      minRaw !== undefined && Number.isFinite(minRaw) && minRaw >= 1
+        ? Math.floor(minRaw)
+        : undefined;
+    const maxLots =
+      maxRaw !== undefined && Number.isFinite(maxRaw) && maxRaw >= 1
+        ? Math.floor(maxRaw)
+        : undefined;
+
+    if (minLots !== undefined || maxLots !== undefined) {
+      cleaned[cat] = {
+        min_lots: minLots,
+        max_lots:
+          minLots !== undefined && maxLots !== undefined ? Math.max(minLots, maxLots) : maxLots,
+      };
+      hasAny = true;
+    }
+  }
+
+  return hasAny ? cleaned : undefined;
+}
+
+function sanitizeMinInvestmentMultiples(raw: unknown): MinInvestmentMultiples | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, unknown>;
+  const cleaned: MinInvestmentMultiples = {};
+  const toInt = (val: unknown, max: number): number | undefined => {
+    if (val === undefined || val === null || val === '') return undefined;
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 1 || n > max) return undefined;
+    return Math.floor(n);
+  };
+  const toAmt = (val: unknown, max: number): number | undefined => {
+    if (val === undefined || val === null || val === '') return undefined;
+    const n = Number(val);
+    if (!Number.isFinite(n) || n <= 0 || n > max) return undefined;
+    return Number(n.toFixed(2));
+  };
+  const minLots = toInt(input.min_lots, 10000);
+  const multipleLots = toInt(input.multiple_lots, 10000);
+  const minShares = toInt(input.min_shares, 100000000);
+  const multipleShares = toInt(input.multiple_shares, 100000000);
+  const minAmount = toAmt(input.min_amount, 10000000000);
+  const multipleAmount = toAmt(input.multiple_amount, 10000000000);
+  const maxMultiples = toInt(input.max_multiples, 1000);
+  if (minLots !== undefined) cleaned.min_lots = minLots;
+  if (multipleLots !== undefined) cleaned.multiple_lots = multipleLots;
+  if (minShares !== undefined) cleaned.min_shares = minShares;
+  if (multipleShares !== undefined) cleaned.multiple_shares = multipleShares;
+  if (minAmount !== undefined) cleaned.min_amount = minAmount;
+  if (multipleAmount !== undefined) cleaned.multiple_amount = multipleAmount;
+  if (maxMultiples !== undefined) cleaned.max_multiples = maxMultiples;
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
+// Configured Reference Data Sources (Official Exchanges, SEBI & Registrars)
 const INITIAL_SOURCES: IPOSource[] = [
   {
     id: '11111111-1111-1111-1111-111111110001',
@@ -394,21 +147,21 @@ const INITIAL_SOURCES: IPOSource[] = [
   },
   {
     id: '11111111-1111-1111-1111-111111110004',
-    provider_name: 'InvestorGain Market Estimates',
+    provider_name: 'Unlisted Market Reference Feed A',
     source_type: 'community_estimate',
-    base_url: 'https://www.investorgain.com/report/live-ipo-gmp/331/',
+    base_url: 'https://www.investorgain.com',
     enabled: true,
-    configuration: { disclaimer: 'Unofficial grey market quotes', speculative: true },
+    configuration: { disclaimer: 'Informational unlisted price reference (non-GMP)', speculative: true },
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },
   {
     id: '11111111-1111-1111-1111-111111110005',
-    provider_name: 'IPOWatch Market Research',
+    provider_name: 'Unlisted Market Reference Feed B',
     source_type: 'community_estimate',
-    base_url: 'https://ipowatch.in/ipo-grey-market-premium-latest-ipo-gmp/',
+    base_url: 'https://ipowatch.in',
     enabled: true,
-    configuration: { disclaimer: 'Dealer circle observations', speculative: true },
+    configuration: { disclaimer: 'Informational pre-listing reference observations', speculative: true },
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },
@@ -424,2306 +177,15 @@ const INITIAL_SOURCES: IPOSource[] = [
   },
 ];
 
-// Helper to compute date string relative to today
-const getRelativeDate = (daysOffset: number): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + daysOffset);
-  return d.toISOString().split('T')[0];
-};
-
-// Initial IPOs
-const INITIAL_IPOS: IPO[] = [
-  // 1. Waaree Energies (Listed)
-  {
-    id: '44444444-4444-4444-4444-444444440001',
-    company_id: '33333333-3333-3333-3333-333333330001',
-    slug: 'waaree-energies-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2024-10-21',
-    close_date: '2024-10-23',
-    allotment_date: '2024-10-24',
-    refund_date: '2024-10-25',
-    demat_credit_date: '2024-10-25',
-    listing_date: '2024-10-28',
-    price_band_min: 1427.0,
-    price_band_max: 1503.0,
-    issue_price: 1503.0,
-    lot_size: 9,
-    issue_size: 4321.44,
-    fresh_issue_size: 3600.0,
-    offer_for_sale_size: 721.44,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/get-quotes/equity?symbol=WAAREEENER',
-    data_verified_at: '2024-10-28T10:00:00Z',
-    published_at: '2024-10-05T08:00:00Z',
-    created_at: '2024-10-01T00:00:00Z',
-    updated_at: '2024-10-28T16:00:00Z',
-  },
-  // 2. Bajaj Housing Finance (Listed)
-  {
-    id: '44444444-4444-4444-4444-444444440002',
-    company_id: '33333333-3333-3333-3333-333333330002',
-    slug: 'bajaj-housing-finance-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2024-09-09',
-    close_date: '2024-09-11',
-    allotment_date: '2024-09-12',
-    refund_date: '2024-09-13',
-    demat_credit_date: '2024-09-13',
-    listing_date: '2024-09-16',
-    price_band_min: 66.0,
-    price_band_max: 70.0,
-    issue_price: 70.0,
-    lot_size: 214,
-    issue_size: 6560.0,
-    fresh_issue_size: 3560.0,
-    offer_for_sale_size: 3000.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/get-quotes/equity?symbol=BAJAJHFL',
-    data_verified_at: '2024-09-16T10:00:00Z',
-    published_at: '2024-09-01T08:00:00Z',
-    created_at: '2024-09-01T00:00:00Z',
-    updated_at: '2024-09-16T16:00:00Z',
-  },
-  // 3. Premier Energies (Listed)
-  {
-    id: '44444444-4444-4444-4444-444444440003',
-    company_id: '33333333-3333-3333-3333-333333330003',
-    slug: 'premier-energies-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2024-08-27',
-    close_date: '2024-08-29',
-    allotment_date: '2024-08-30',
-    refund_date: '2024-09-02',
-    demat_credit_date: '2024-09-02',
-    listing_date: '2024-09-03',
-    price_band_min: 427.0,
-    price_band_max: 450.0,
-    issue_price: 450.0,
-    lot_size: 33,
-    issue_size: 2830.4,
-    fresh_issue_size: 1291.4,
-    offer_for_sale_size: 1539.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/get-quotes/equity?symbol=PREMIERENE',
-    data_verified_at: '2024-09-03T10:00:00Z',
-    published_at: '2024-08-20T08:00:00Z',
-    created_at: '2024-08-20T00:00:00Z',
-    updated_at: '2024-09-03T16:00:00Z',
-  },
-  // 4. Hyundai Motor India (Listed)
-  {
-    id: '44444444-4444-4444-4444-444444440004',
-    company_id: '33333333-3333-3333-3333-333333330004',
-    slug: 'hyundai-motor-india-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2024-10-15',
-    close_date: '2024-10-17',
-    allotment_date: '2024-10-18',
-    refund_date: '2024-10-21',
-    demat_credit_date: '2024-10-21',
-    listing_date: '2024-10-22',
-    price_band_min: 1865.0,
-    price_band_max: 1960.0,
-    issue_price: 1960.0,
-    lot_size: 7,
-    issue_size: 27870.16,
-    fresh_issue_size: 0.0,
-    offer_for_sale_size: 27870.16,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/get-quotes/equity?symbol=HYUNDAI',
-    data_verified_at: '2024-10-22T10:00:00Z',
-    published_at: '2024-10-01T08:00:00Z',
-    created_at: '2024-10-01T00:00:00Z',
-    updated_at: '2024-10-22T16:00:00Z',
-  },
-  // 5. Swiggy Limited (Listed)
-  {
-    id: '44444444-4444-4444-4444-444444440005',
-    company_id: '33333333-3333-3333-3333-333333330005',
-    slug: 'swiggy-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2024-11-06',
-    close_date: '2024-11-08',
-    allotment_date: '2024-11-11',
-    refund_date: '2024-11-12',
-    demat_credit_date: '2024-11-12',
-    listing_date: '2024-11-13',
-    price_band_min: 371.0,
-    price_band_max: 390.0,
-    issue_price: 390.0,
-    lot_size: 38,
-    issue_size: 11327.43,
-    fresh_issue_size: 4499.0,
-    offer_for_sale_size: 6828.43,
-    retail_quota_percent: 10.0,
-    qib_quota_percent: 75.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/get-quotes/equity?symbol=SWIGGY',
-    data_verified_at: '2024-11-13T10:00:00Z',
-    published_at: '2024-10-25T08:00:00Z',
-    created_at: '2024-10-25T00:00:00Z',
-    updated_at: '2024-11-13T16:00:00Z',
-  },
-  // 6. NTPC Green Energy (Listed)
-  {
-    id: '44444444-4444-4444-4444-444444440012',
-    company_id: '33333333-3333-3333-3333-333333330006',
-    slug: 'ntpc-green-energy-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2024-11-19',
-    close_date: '2024-11-22',
-    allotment_date: '2024-11-25',
-    refund_date: '2024-11-26',
-    demat_credit_date: '2024-11-26',
-    listing_date: '2024-11-27',
-    price_band_min: 102.0,
-    price_band_max: 108.0,
-    issue_price: 108.0,
-    lot_size: 138,
-    issue_size: 10000.0,
-    fresh_issue_size: 10000.0,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 10.0,
-    qib_quota_percent: 75.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/get-quotes/equity?symbol=NTPCGREEN',
-    data_verified_at: '2024-11-27T10:00:00Z',
-    published_at: '2024-11-13T08:00:00Z',
-    created_at: '2024-11-13T00:00:00Z',
-    updated_at: '2024-11-27T16:00:00Z',
-  },
-  // 7. Ganesh Green Bharat (SME Listed)
-  {
-    id: '44444444-4444-4444-4444-444444440006',
-    company_id: '33333333-3333-3333-3333-333333330012',
-    slug: 'ganesh-green-bharat-ipo',
-    category: 'SME',
-    exchange: 'NSE Emerge',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2024-07-05',
-    close_date: '2024-07-09',
-    allotment_date: '2024-07-10',
-    refund_date: '2024-07-11',
-    demat_credit_date: '2024-07-11',
-    listing_date: '2024-07-12',
-    price_band_min: 181.0,
-    price_band_max: 190.0,
-    issue_price: 190.0,
-    lot_size: 600,
-    issue_size: 125.23,
-    fresh_issue_size: 125.23,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/get-quotes/equity?symbol=GGBL',
-    data_verified_at: '2024-07-12T10:00:00Z',
-    published_at: '2024-06-25T08:00:00Z',
-    created_at: '2024-06-25T00:00:00Z',
-    updated_at: '2024-07-12T16:00:00Z',
-  },
-  // 7. HD Fire Protect (Listed October 2026)
-  {
-    id: '44444444-4444-4444-4444-444444440023',
-    company_id: '33333333-3333-3333-3333-333333330023',
-    slug: 'hd-fire-protect-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'listed',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-12',
-    close_date: '2026-10-14',
-    allotment_date: '2026-10-15',
-    refund_date: '2026-10-16',
-    demat_credit_date: '2026-10-19',
-    listing_date: '2026-10-20',
-    price_band_min: 258.0,
-    price_band_max: 271.0,
-    issue_price: 271.0,
-    lot_size: 55,
-    issue_size: 380.0,
-    fresh_issue_size: 300.0,
-    offer_for_sale_size: 80.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: '2026-10-20T10:00:00Z',
-    published_at: '2026-10-01T08:00:00Z',
-    created_at: '2026-10-01T00:00:00Z',
-    updated_at: '2026-10-20T16:00:00Z',
-  },
-  // 8. Jio Platforms Limited (Reliance Jio IPO - LIVE NOW)
-  {
-    id: '44444444-4444-4444-4444-444444440020',
-    company_id: '33333333-3333-3333-3333-333333330020',
-    slug: 'jio-platforms-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-21',
-    close_date: '2026-10-23',
-    allotment_date: '2026-10-24',
-    refund_date: '2026-10-27',
-    demat_credit_date: '2026-10-27',
-    listing_date: '2026-10-28',
-    price_band_min: 1065.0,
-    price_band_max: 1119.0,
-    issue_price: undefined,
-    lot_size: 12,
-    issue_size: 30213.0,
-    fresh_issue_size: 30213.0,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-10T08:00:00Z',
-    created_at: '2026-10-10T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 9. Paras Healthcare Limited (Ongoing Mainboard - LIVE NOW)
-  {
-    id: '44444444-4444-4444-4444-444444440021',
-    company_id: '33333333-3333-3333-3333-333333330021',
-    slug: 'paras-healthcare-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-21',
-    close_date: '2026-10-23',
-    allotment_date: '2026-10-24',
-    refund_date: '2026-10-27',
-    demat_credit_date: '2026-10-27',
-    listing_date: '2026-10-28',
-    price_band_min: 660.0,
-    price_band_max: 693.0,
-    issue_price: undefined,
-    lot_size: 21,
-    issue_size: 850.0,
-    fresh_issue_size: 500.0,
-    offer_for_sale_size: 350.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-12T08:00:00Z',
-    created_at: '2026-10-12T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 10. Acme India Industries Limited (Ongoing Mainboard - LIVE NOW)
-  {
-    id: '44444444-4444-4444-4444-444444440022',
-    company_id: '33333333-3333-3333-3333-333333330022',
-    slug: 'acme-india-industries-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-21',
-    close_date: '2026-10-23',
-    allotment_date: '2026-10-24',
-    refund_date: '2026-10-27',
-    demat_credit_date: '2026-10-27',
-    listing_date: '2026-10-28',
-    price_band_min: 186.0,
-    price_band_max: 196.0,
-    issue_price: undefined,
-    lot_size: 76,
-    issue_size: 122.0,
-    fresh_issue_size: 105.98,
-    offer_for_sale_size: 16.02,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Bigshare Services Private Limited',
-    registrar_url: 'https://www.bigshareonline.com/ipo_Allotment.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-14T08:00:00Z',
-    created_at: '2026-10-14T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 11. Bonfiglioli Transmissions Limited (Closed Oct 19 - Allotment Awaiting)
-  {
-    id: '44444444-4444-4444-4444-444444440024',
-    company_id: '33333333-3333-3333-3333-333333330024',
-    slug: 'bonfiglioli-transmissions-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'closed',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-15',
-    close_date: '2026-10-19',
-    allotment_date: '2026-10-23',
-    refund_date: '2026-10-24',
-    demat_credit_date: '2026-10-24',
-    listing_date: '2026-10-25',
-    price_band_min: 585.0,
-    price_band_max: 615.0,
-    issue_price: 615.0,
-    lot_size: 24,
-    issue_size: 1000.0,
-    fresh_issue_size: 400.0,
-    offer_for_sale_size: 600.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-05T08:00:00Z',
-    created_at: '2026-10-05T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 12. Tonbo Imaging Limited (Closed Oct 19 - High Demand GMP)
-  {
-    id: '44444444-4444-4444-4444-444444440025',
-    company_id: '33333333-3333-3333-3333-333333330025',
-    slug: 'tonbo-imaging-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'closed',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-15',
-    close_date: '2026-10-19',
-    allotment_date: '2026-10-23',
-    refund_date: '2026-10-24',
-    demat_credit_date: '2026-10-24',
-    listing_date: '2026-10-25',
-    price_band_min: 675.0,
-    price_band_max: 710.0,
-    issue_price: 710.0,
-    lot_size: 21,
-    issue_size: 650.0,
-    fresh_issue_size: 350.0,
-    offer_for_sale_size: 300.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-05T08:00:00Z',
-    created_at: '2026-10-05T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 13. SFC Environmental Technologies Limited (Upcoming Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440026',
-    company_id: '33333333-3333-3333-3333-333333330026',
-    slug: 'sfc-environmental-technologies-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'upcoming',
-    announcement_status: 'dates_announced',
-    open_date: '2026-10-27',
-    close_date: '2026-10-29',
-    allotment_date: '2026-10-30',
-    refund_date: '2026-11-02',
-    demat_credit_date: '2026-11-02',
-    listing_date: '2026-11-03',
-    price_band_min: 310.0,
-    price_band_max: 326.0,
-    issue_price: undefined,
-    lot_size: 46,
-    issue_size: 320.0,
-    fresh_issue_size: 200.0,
-    offer_for_sale_size: 120.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-18T08:00:00Z',
-    created_at: '2026-10-18T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 14. BLS Polymers Limited (Upcoming Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440027',
-    company_id: '33333333-3333-3333-3333-333333330027',
-    slug: 'bls-polymers-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'upcoming',
-    announcement_status: 'dates_announced',
-    open_date: '2026-10-27',
-    close_date: '2026-10-29',
-    allotment_date: '2026-10-30',
-    refund_date: '2026-11-02',
-    demat_credit_date: '2026-11-02',
-    listing_date: '2026-11-03',
-    price_band_min: 142.0,
-    price_band_max: 150.0,
-    issue_price: undefined,
-    lot_size: 100,
-    issue_size: 180.0,
-    fresh_issue_size: 140.0,
-    offer_for_sale_size: 40.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Bigshare Services Private Limited',
-    registrar_url: 'https://www.bigshareonline.com/ipo_Allotment.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-18T08:00:00Z',
-    created_at: '2026-10-18T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 15. Danish Power Limited (SME Emerge - Super Subscribed 88.5x)
-  {
-    id: '44444444-4444-4444-4444-444444440028',
-    company_id: '33333333-3333-3333-3333-333333330028',
-    slug: 'danish-power-ipo',
-    category: 'SME',
-    exchange: 'NSE Emerge',
-    status: 'closed',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-18',
-    close_date: '2026-10-21',
-    allotment_date: '2026-10-23',
-    refund_date: '2026-10-24',
-    demat_credit_date: '2026-10-24',
-    listing_date: '2026-10-25',
-    price_band_min: 360.0,
-    price_band_max: 380.0,
-    issue_price: 380.0,
-    lot_size: 300,
-    issue_size: 197.9,
-    fresh_issue_size: 197.9,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-10T08:00:00Z',
-    created_at: '2026-10-10T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 16. United Heat Transfer Limited (SME Emerge - LIVE NOW)
-  {
-    id: '44444444-4444-4444-4444-444444440029',
-    company_id: '33333333-3333-3333-3333-333333330029',
-    slug: 'united-heat-transfer-ipo',
-    category: 'SME',
-    exchange: 'NSE Emerge',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-20',
-    close_date: '2026-10-22',
-    allotment_date: '2026-10-23',
-    refund_date: '2026-10-24',
-    demat_credit_date: '2026-10-24',
-    listing_date: '2026-10-25',
-    price_band_min: 56.0,
-    price_band_max: 59.0,
-    issue_price: undefined,
-    lot_size: 2000,
-    issue_size: 30.0,
-    fresh_issue_size: 30.0,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 50.0,
-    qib_quota_percent: 0.0,
-    nii_quota_percent: 50.0,
-    registrar_name: 'Bigshare Services Private Limited',
-    registrar_url: 'https://www.bigshareonline.com/ipo_Allotment.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-12T08:00:00Z',
-    created_at: '2026-10-12T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 17. Deepak Builders & Engineers Limited (Mainboard Closed)
-  {
-    id: '44444444-4444-4444-4444-444444440030',
-    company_id: '33333333-3333-3333-3333-333333330030',
-    slug: 'deepak-builders-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'closed',
-    announcement_status: 'confirmed',
-    open_date: '2026-10-18',
-    close_date: '2026-10-21',
-    allotment_date: '2026-10-23',
-    refund_date: '2026-10-24',
-    demat_credit_date: '2026-10-24',
-    listing_date: '2026-10-25',
-    price_band_min: 192.0,
-    price_band_max: 203.0,
-    issue_price: 203.0,
-    lot_size: 73,
-    issue_size: 260.04,
-    fresh_issue_size: 217.21,
-    offer_for_sale_size: 42.83,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: new Date().toISOString(),
-    published_at: '2026-10-10T08:00:00Z',
-    created_at: '2026-10-10T00:00:00Z',
-    updated_at: new Date().toISOString(),
-  },
-  // 11. Ventive Hospitality (Ongoing Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440013',
-    company_id: '33333333-3333-3333-3333-333333330013',
-    slug: 'ventive-hospitality-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: getRelativeDate(-1),
-    close_date: getRelativeDate(2),
-    allotment_date: getRelativeDate(3),
-    refund_date: getRelativeDate(4),
-    demat_credit_date: getRelativeDate(4),
-    listing_date: getRelativeDate(6),
-    price_band_min: 610.0,
-    price_band_max: 643.0,
-    issue_price: undefined,
-    lot_size: 23,
-    issue_size: 2000.0,
-    fresh_issue_size: 2000.0,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-4),
-    created_at: getRelativeDate(-4),
-    updated_at: new Date().toISOString(),
-  },
-  // 9. Senores Pharmaceuticals (Ongoing Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440014',
-    company_id: '33333333-3333-3333-3333-333333330014',
-    slug: 'senores-pharmaceuticals-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: getRelativeDate(0),
-    close_date: getRelativeDate(3),
-    allotment_date: getRelativeDate(4),
-    refund_date: getRelativeDate(5),
-    demat_credit_date: getRelativeDate(5),
-    listing_date: getRelativeDate(7),
-    price_band_min: 371.0,
-    price_band_max: 391.0,
-    issue_price: undefined,
-    lot_size: 38,
-    issue_size: 582.0,
-    fresh_issue_size: 500.0,
-    offer_for_sale_size: 82.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-3),
-    created_at: getRelativeDate(-3),
-    updated_at: new Date().toISOString(),
-  },
-  // 10. Carraro India (Ongoing Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440015',
-    company_id: '33333333-3333-3333-3333-333333330015',
-    slug: 'carraro-india-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: getRelativeDate(-2),
-    close_date: getRelativeDate(1),
-    allotment_date: getRelativeDate(2),
-    refund_date: getRelativeDate(3),
-    demat_credit_date: getRelativeDate(3),
-    listing_date: getRelativeDate(5),
-    price_band_min: 668.0,
-    price_band_max: 704.0,
-    issue_price: undefined,
-    lot_size: 21,
-    issue_size: 1811.65,
-    fresh_issue_size: 0.0,
-    offer_for_sale_size: 1811.65,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-5),
-    created_at: getRelativeDate(-5),
-    updated_at: new Date().toISOString(),
-  },
-  // 11. Unimech Aerospace and Manufacturing (Ongoing Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440016',
-    company_id: '33333333-3333-3333-3333-333333330016',
-    slug: 'unimech-aerospace-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: getRelativeDate(-1),
-    close_date: getRelativeDate(2),
-    allotment_date: getRelativeDate(3),
-    refund_date: getRelativeDate(4),
-    demat_credit_date: getRelativeDate(4),
-    listing_date: getRelativeDate(6),
-    price_band_min: 745.0,
-    price_band_max: 785.0,
-    issue_price: undefined,
-    lot_size: 19,
-    issue_size: 500.0,
-    fresh_issue_size: 250.0,
-    offer_for_sale_size: 250.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-4),
-    created_at: getRelativeDate(-4),
-    updated_at: new Date().toISOString(),
-  },
-  // 12. Enviro Infra Engineers (Ongoing Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440007',
-    company_id: '33333333-3333-3333-3333-333333330007',
-    slug: 'enviro-infra-engineers-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: getRelativeDate(-1),
-    close_date: getRelativeDate(2),
-    allotment_date: getRelativeDate(3),
-    refund_date: getRelativeDate(4),
-    demat_credit_date: getRelativeDate(4),
-    listing_date: getRelativeDate(6),
-    price_band_min: 140.0,
-    price_band_max: 148.0,
-    issue_price: undefined,
-    lot_size: 101,
-    issue_size: 650.43,
-    fresh_issue_size: 572.46,
-    offer_for_sale_size: 77.97,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Bigshare Services Private Limited',
-    registrar_url: 'https://www.bigshareonline.com/ipo_Allotment.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-5),
-    created_at: getRelativeDate(-5),
-    updated_at: new Date().toISOString(),
-  },
-  // 13. Rajputana Biodiesel (Ongoing SME)
-  {
-    id: '44444444-4444-4444-4444-444444440008',
-    company_id: '33333333-3333-3333-3333-333333330008',
-    slug: 'rajputana-biodiesel-ipo',
-    category: 'SME',
-    exchange: 'NSE Emerge',
-    status: 'ongoing',
-    announcement_status: 'confirmed',
-    open_date: getRelativeDate(0),
-    close_date: getRelativeDate(3),
-    allotment_date: getRelativeDate(4),
-    refund_date: getRelativeDate(5),
-    demat_credit_date: getRelativeDate(5),
-    listing_date: getRelativeDate(7),
-    price_band_min: 123.0,
-    price_band_max: 130.0,
-    issue_price: undefined,
-    lot_size: 1000,
-    issue_size: 24.7,
-    fresh_issue_size: 24.7,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Maashitla Securities Private Limited',
-    registrar_url: 'https://maashitla.com/allotment-status',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-3),
-    created_at: getRelativeDate(-3),
-    updated_at: new Date().toISOString(),
-  },
-  // 14. Vishal Mega Mart (Upcoming Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440010',
-    company_id: '33333333-3333-3333-3333-333333330010',
-    slug: 'vishal-mega-mart-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'upcoming',
-    announcement_status: 'dates_announced',
-    open_date: getRelativeDate(4),
-    close_date: getRelativeDate(7),
-    allotment_date: getRelativeDate(8),
-    refund_date: getRelativeDate(9),
-    demat_credit_date: getRelativeDate(9),
-    listing_date: getRelativeDate(11),
-    price_band_min: 74.0,
-    price_band_max: 78.0,
-    issue_price: undefined,
-    lot_size: 190,
-    issue_size: 8000.0,
-    fresh_issue_size: 0.0,
-    offer_for_sale_size: 8000.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'KFin Technologies Limited',
-    registrar_url: 'https://kosmic.kfintech.com/ipostatus/',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-2),
-    created_at: getRelativeDate(-2),
-    updated_at: new Date().toISOString(),
-  },
-  // 15. Indo Farm Equipment (Upcoming Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440017',
-    company_id: '33333333-3333-3333-3333-333333330017',
-    slug: 'indo-farm-equipment-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'upcoming',
-    announcement_status: 'dates_announced',
-    open_date: getRelativeDate(6),
-    close_date: getRelativeDate(9),
-    allotment_date: getRelativeDate(10),
-    refund_date: getRelativeDate(11),
-    demat_credit_date: getRelativeDate(11),
-    listing_date: getRelativeDate(13),
-    price_band_min: 205.0,
-    price_band_max: 215.0,
-    issue_price: undefined,
-    lot_size: 69,
-    issue_size: 275.0,
-    fresh_issue_size: 275.0,
-    offer_for_sale_size: 0.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.bseindia.com/markets/PublicIssues/IPOIssues_new.aspx',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-1),
-    created_at: getRelativeDate(-1),
-    updated_at: new Date().toISOString(),
-  },
-  // 16. Mamata Machinery (Upcoming Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440018',
-    company_id: '33333333-3333-3333-3333-333333330018',
-    slug: 'mamata-machinery-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'upcoming',
-    announcement_status: 'dates_announced',
-    open_date: getRelativeDate(9),
-    close_date: getRelativeDate(12),
-    allotment_date: getRelativeDate(13),
-    refund_date: getRelativeDate(14),
-    demat_credit_date: getRelativeDate(14),
-    listing_date: getRelativeDate(16),
-    price_band_min: 230.0,
-    price_band_max: 243.0,
-    issue_price: undefined,
-    lot_size: 61,
-    issue_size: 400.0,
-    fresh_issue_size: 0.0,
-    offer_for_sale_size: 400.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-2),
-    created_at: getRelativeDate(-2),
-    updated_at: new Date().toISOString(),
-  },
-  // 17. DAM Capital Advisors (Upcoming Mainboard)
-  {
-    id: '44444444-4444-4444-4444-444444440019',
-    company_id: '33333333-3333-3333-3333-333333330019',
-    slug: 'dam-capital-advisors-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'upcoming',
-    announcement_status: 'dates_announced',
-    open_date: getRelativeDate(12),
-    close_date: getRelativeDate(15),
-    allotment_date: getRelativeDate(16),
-    refund_date: getRelativeDate(17),
-    demat_credit_date: getRelativeDate(17),
-    listing_date: getRelativeDate(19),
-    price_band_min: 269.0,
-    price_band_max: 283.0,
-    issue_price: undefined,
-    lot_size: 53,
-    issue_size: 840.0,
-    fresh_issue_size: 0.0,
-    offer_for_sale_size: 840.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-3),
-    created_at: getRelativeDate(-3),
-    updated_at: new Date().toISOString(),
-  },
-  // 18. Hexaware Technologies (Upcoming Expected)
-  {
-    id: '44444444-4444-4444-4444-444444440011',
-    company_id: '33333333-3333-3333-3333-333333330011',
-    slug: 'hexaware-technologies-ipo',
-    category: 'Mainboard',
-    exchange: 'NSE, BSE',
-    status: 'upcoming',
-    announcement_status: 'expected',
-    open_date: getRelativeDate(16),
-    close_date: getRelativeDate(20),
-    allotment_date: getRelativeDate(21),
-    refund_date: getRelativeDate(22),
-    demat_credit_date: getRelativeDate(22),
-    listing_date: getRelativeDate(24),
-    price_band_min: undefined,
-    price_band_max: undefined,
-    issue_price: undefined,
-    lot_size: undefined,
-    issue_size: 9950.0,
-    fresh_issue_size: 0.0,
-    offer_for_sale_size: 9950.0,
-    retail_quota_percent: 35.0,
-    qib_quota_percent: 50.0,
-    nii_quota_percent: 15.0,
-    registrar_name: 'Link Intime India Private Limited',
-    registrar_url: 'https://linkintime.co.in/initial_offerings/public-issues.html',
-    drhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    rhp_url: 'https://www.sebi.gov.in/filings/public-issues.html',
-    official_source_url: 'https://www.nseindia.com/market-data/all-upcoming-issues-ipo',
-    data_verified_at: new Date().toISOString(),
-    published_at: getRelativeDate(-4),
-    created_at: getRelativeDate(-4),
-    updated_at: new Date().toISOString(),
-  },
-];
-
-// Initial Listing Results
-const INITIAL_LISTING_RESULTS: ListingResult[] = [
-  {
-    id: '55555555-5555-5555-5555-555555550001',
-    ipo_id: '44444444-4444-4444-4444-444444440001',
-    issue_price: 1503.0,
-    listing_price: 2550.0,
-    listing_date: '2024-10-28',
-    first_day_close: 2345.0,
-    previous_close: 2550.0,
-    verified_at: '2024-10-28T10:00:00Z',
-    created_at: '2024-10-28T10:00:00Z',
-    updated_at: '2024-10-28T16:00:00Z',
-  },
-  {
-    id: '55555555-5555-5555-5555-555555550002',
-    ipo_id: '44444444-4444-4444-4444-444444440002',
-    issue_price: 70.0,
-    listing_price: 150.0,
-    listing_date: '2024-09-16',
-    first_day_close: 165.0,
-    previous_close: 150.0,
-    verified_at: '2024-09-16T10:00:00Z',
-    created_at: '2024-09-16T10:00:00Z',
-    updated_at: '2024-09-16T16:00:00Z',
-  },
-  {
-    id: '55555555-5555-5555-5555-555555550003',
-    ipo_id: '44444444-4444-4444-4444-444444440003',
-    issue_price: 450.0,
-    listing_price: 991.0,
-    listing_date: '2024-09-03',
-    first_day_close: 990.0,
-    previous_close: 991.0,
-    verified_at: '2024-09-03T10:00:00Z',
-    created_at: '2024-09-03T10:00:00Z',
-    updated_at: '2024-09-03T16:00:00Z',
-  },
-  {
-    id: '55555555-5555-5555-5555-555555550004',
-    ipo_id: '44444444-4444-4444-4444-444444440004',
-    issue_price: 1960.0,
-    listing_price: 1934.0,
-    listing_date: '2024-10-22',
-    first_day_close: 1819.6,
-    previous_close: 1934.0,
-    verified_at: '2024-10-22T10:00:00Z',
-    created_at: '2024-10-22T10:00:00Z',
-    updated_at: '2024-10-22T16:00:00Z',
-  },
-  {
-    id: '55555555-5555-5555-5555-555555550005',
-    ipo_id: '44444444-4444-4444-4444-444444440005',
-    issue_price: 390.0,
-    listing_price: 420.0,
-    listing_date: '2024-11-13',
-    first_day_close: 456.0,
-    previous_close: 420.0,
-    verified_at: '2024-11-13T10:00:00Z',
-    created_at: '2024-11-13T10:00:00Z',
-    updated_at: '2024-11-13T16:00:00Z',
-  },
-  {
-    id: '55555555-5555-5555-5555-555555550006',
-    ipo_id: '44444444-4444-4444-4444-444444440006',
-    issue_price: 190.0,
-    listing_price: 361.0,
-    listing_date: '2024-07-12',
-    first_day_close: 379.05,
-    previous_close: 361.0,
-    verified_at: '2024-07-12T10:00:00Z',
-    created_at: '2024-07-12T10:00:00Z',
-    updated_at: '2024-07-12T16:00:00Z',
-  },
-  {
-    id: '55555555-5555-5555-5555-555555550007',
-    ipo_id: '44444444-4444-4444-4444-444444440012',
-    issue_price: 108.0,
-    listing_price: 111.5,
-    listing_date: '2024-11-27',
-    first_day_close: 122.0,
-    previous_close: 111.5,
-    verified_at: '2024-11-27T10:00:00Z',
-    created_at: '2024-11-27T10:00:00Z',
-    updated_at: '2024-11-27T16:00:00Z',
-  },
-  {
-    id: '55555555-5555-5555-5555-555555550008',
-    ipo_id: '44444444-4444-4444-4444-444444440023',
-    issue_price: 271.0,
-    listing_price: 340.0,
-    listing_date: '2026-10-20',
-    first_day_close: 338.5,
-    previous_close: 340.0,
-    verified_at: '2026-10-20T10:00:00Z',
-    created_at: '2026-10-20T10:00:00Z',
-    updated_at: '2026-10-20T16:00:00Z',
-  },
-];
-
-// Initial GMP Snapshots (Rich time-series for trend charts)
-const INITIAL_GMP_SNAPSHOTS: GMPSnapshot[] = [
-  // 0. Jio Platforms Limited (Reliance Jio IPO - LIVE NOW)
-  {
-    id: '66666666-6666-6666-6666-666666660030',
-    ipo_id: '44444444-4444-4444-4444-444444440020',
-    gmp_amount: 180.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Initial dealer consensus pre-bidding',
-    created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660031',
-    ipo_id: '44444444-4444-4444-4444-444444440020',
-    gmp_amount: 215.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Massive Day 1 bidding surge expanding premium',
-    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660032',
-    ipo_id: '44444444-4444-4444-4444-444444440020',
-    gmp_amount: 246.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 750,
-    subject_to_sauda_rate: 6500,
-    fire_rating: 5,
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Live premium holding firm at 22% on 4.35x subscription',
-    created_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-  },
-  // Paras Healthcare Limited (Live)
-  {
-    id: '66666666-6666-6666-6666-666666660033',
-    ipo_id: '44444444-4444-4444-4444-444444440021',
-    gmp_amount: 45.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 250,
-    subject_to_sauda_rate: 2000,
-    fire_rating: 3,
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Active hospital network valuation quote',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Acme India Industries Limited (Live)
-  {
-    id: '66666666-6666-6666-6666-666666660034',
-    ipo_id: '44444444-4444-4444-4444-444444440022',
-    gmp_amount: 38.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 220,
-    subject_to_sauda_rate: 1800,
-    fire_rating: 4,
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Robust machinery engineering order book',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Bonfiglioli Transmissions Limited (Closed Oct 19)
-  {
-    id: '66666666-6666-6666-6666-666666660035',
-    ipo_id: '44444444-4444-4444-4444-444444440024',
-    gmp_amount: 78.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 350,
-    subject_to_sauda_rate: 2200,
-    fire_rating: 3,
-    source_name: 'IPO Premium Dealer Consensus',
-    source_url: 'https://www.ipopremium.in',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Gearmotors market leader steady quotation',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Tonbo Imaging Limited (Closed Oct 19 - High Demand)
-  {
-    id: '66666666-6666-6666-6666-666666660036',
-    ipo_id: '44444444-4444-4444-4444-444444440025',
-    gmp_amount: 455.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 800,
-    subject_to_sauda_rate: 6800,
-    fire_rating: 5,
-    source_name: 'IPO Premium Dealer Consensus',
-    source_url: 'https://www.ipopremium.in',
-    observed_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Defence electro-optics high demand +64% premium',
-    created_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-  },
-  // SFC Environmental Technologies Limited (Upcoming)
-  {
-    id: '66666666-6666-6666-6666-666666660037',
-    ipo_id: '44444444-4444-4444-4444-444444440026',
-    gmp_amount: 20.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 150,
-    subject_to_sauda_rate: 1100,
-    fire_rating: 2,
-    source_name: 'IPO Premium Dealer Consensus',
-    source_url: 'https://www.ipopremium.in',
-    observed_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'CleanTech wastewater initial pre-IPO quote',
-    created_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-  },
-  // BLS Polymers Limited (Upcoming)
-  {
-    id: '66666666-6666-6666-6666-666666660038',
-    ipo_id: '44444444-4444-4444-4444-444444440027',
-    gmp_amount: 29.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 200,
-    subject_to_sauda_rate: 1600,
-    fire_rating: 3,
-    source_name: 'IPO Premium Dealer Consensus',
-    source_url: 'https://www.ipopremium.in',
-    observed_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Polymer masterbatches +19.3% expected listing gain',
-    created_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-  },
-  // Danish Power Limited (SME Emerge)
-  {
-    id: '66666666-6666-6666-6666-666666660039',
-    ipo_id: '44444444-4444-4444-4444-444444440028',
-    gmp_amount: 280.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 1200,
-    subject_to_sauda_rate: 12000,
-    fire_rating: 5,
-    source_name: 'IPO Premium Dealer Consensus',
-    source_url: 'https://www.ipopremium.in',
-    observed_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Massive solar inverter transformer demand +73.7%',
-    created_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-  },
-  // United Heat Transfer Limited (SME Emerge)
-  {
-    id: '66666666-6666-6666-6666-666666660040',
-    ipo_id: '44444444-4444-4444-4444-444444440029',
-    gmp_amount: 26.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 600,
-    subject_to_sauda_rate: 4500,
-    fire_rating: 4,
-    source_name: 'IPO Premium Dealer Consensus',
-    source_url: 'https://www.ipopremium.in',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Heavy heat exchangers engineering +44.1%',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Deepak Builders & Engineers Limited (Mainboard)
-  {
-    id: '66666666-6666-6666-6666-666666660041',
-    ipo_id: '44444444-4444-4444-4444-444444440030',
-    gmp_amount: 40.0,
-    currency: 'INR',
-    unit: 'per share',
-    kostak_rate: 250,
-    subject_to_sauda_rate: 2200,
-    fire_rating: 3,
-    source_name: 'IPO Premium Dealer Consensus',
-    source_url: 'https://www.ipopremium.in',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Hospital & infrastructure orderbook +19.7%',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // 1. Ventive Hospitality (Ongoing)
-  {
-    id: '66666666-6666-6666-6666-666666660010',
-    ipo_id: '44444444-4444-4444-4444-444444440013',
-    gmp_amount: 55.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Pre-bidding quotation',
-    created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660011',
-    ipo_id: '44444444-4444-4444-4444-444444440013',
-    gmp_amount: 68.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Institutional interest expanding premium',
-    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660012',
-    ipo_id: '44444444-4444-4444-4444-444444440013',
-    gmp_amount: 75.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Firm bids on luxury hotel assets',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-
-  // 2. Senores Pharmaceuticals (Ongoing)
-  {
-    id: '66666666-6666-6666-6666-666666660013',
-    ipo_id: '44444444-4444-4444-4444-444444440014',
-    gmp_amount: 65.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 40 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 40 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Initial dealer consensus',
-    created_at: new Date(Date.now() - 40 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660014',
-    ipo_id: '44444444-4444-4444-4444-444444440014',
-    gmp_amount: 76.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 16 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 16 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Robust retail subscription drive',
-    created_at: new Date(Date.now() - 16 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660015',
-    ipo_id: '44444444-4444-4444-4444-444444440014',
-    gmp_amount: 88.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'High demand for specialty generic portfolio',
-    created_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-  },
-
-  // 3. Carraro India (Ongoing)
-  {
-    id: '66666666-6666-6666-6666-666666660016',
-    ipo_id: '44444444-4444-4444-4444-444444440015',
-    gmp_amount: 40.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Initial quotation',
-    created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660017',
-    ipo_id: '44444444-4444-4444-4444-444444440015',
-    gmp_amount: 52.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 20 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 20 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Solid tractor OEM orders',
-    created_at: new Date(Date.now() - 20 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660018',
-    ipo_id: '44444444-4444-4444-4444-444444440015',
-    gmp_amount: 60.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Active market rate',
-    created_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-  },
-
-  // 4. Unimech Aerospace (Ongoing)
-  {
-    id: '66666666-6666-6666-6666-666666660019',
-    ipo_id: '44444444-4444-4444-4444-444444440016',
-    gmp_amount: 125.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 44 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 44 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'High aerospace sector valuation benchmark',
-    created_at: new Date(Date.now() - 44 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660020',
-    ipo_id: '44444444-4444-4444-4444-444444440016',
-    gmp_amount: 148.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 18 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 18 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Strong NII interest',
-    created_at: new Date(Date.now() - 18 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660021',
-    ipo_id: '44444444-4444-4444-4444-444444440016',
-    gmp_amount: 165.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Premium steady at 21%',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-
-  // 5. Enviro Infra Engineers (Ongoing)
-  {
-    id: '66666666-6666-6666-6666-666666660001',
-    ipo_id: '44444444-4444-4444-4444-444444440007',
-    gmp_amount: 32.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Initial unofficial quotation',
-    created_at: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660002',
-    ipo_id: '44444444-4444-4444-4444-444444440007',
-    gmp_amount: 37.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Firm retail inquiries reported',
-    created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660003',
-    ipo_id: '44444444-4444-4444-4444-444444440007',
-    gmp_amount: 41.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Subscription multiples driving GMP expansion',
-    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660004',
-    ipo_id: '44444444-4444-4444-4444-444444440007',
-    gmp_amount: 44.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Current active observation',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-
-  // 6. Rajputana Biodiesel (SME Ongoing)
-  {
-    id: '66666666-6666-6666-6666-666666660005',
-    ipo_id: '44444444-4444-4444-4444-444444440008',
-    gmp_amount: 70.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Initial quote',
-    created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660006',
-    ipo_id: '44444444-4444-4444-4444-444444440008',
-    gmp_amount: 85.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Significant premium over issue price',
-    created_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-  },
-
-  // 7. Vishal Mega Mart (Upcoming)
-  {
-    id: '66666666-6666-6666-6666-666666660009',
-    ipo_id: '44444444-4444-4444-4444-444444440010',
-    gmp_amount: 14.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Early pre-IPO dealer bids',
-    created_at: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660022',
-    ipo_id: '44444444-4444-4444-4444-444444440010',
-    gmp_amount: 18.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Strong consumer brand appetite',
-    created_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-  },
-
-  // 8. Indo Farm Equipment (Upcoming)
-  {
-    id: '66666666-6666-6666-6666-666666660023',
-    ipo_id: '44444444-4444-4444-4444-444444440017',
-    gmp_amount: 30.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Initial unofficial quote',
-    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660024',
-    ipo_id: '44444444-4444-4444-4444-444444440017',
-    gmp_amount: 35.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Healthy indicative listing expectations',
-    created_at: new Date(Date.now() - 6 * 3600 * 1000).toISOString(),
-  },
-
-  // 9. Mamata Machinery (Upcoming)
-  {
-    id: '66666666-6666-6666-6666-666666660025',
-    ipo_id: '44444444-4444-4444-4444-444444440018',
-    gmp_amount: 36.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 28 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 28 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Packaging automation peer comparison',
-    created_at: new Date(Date.now() - 28 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660026',
-    ipo_id: '44444444-4444-4444-4444-444444440018',
-    gmp_amount: 42.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Export order book driving sentiment',
-    created_at: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-  },
-
-  // 10. DAM Capital Advisors (Upcoming)
-  {
-    id: '66666666-6666-6666-6666-666666660027',
-    ipo_id: '44444444-4444-4444-4444-444444440019',
-    gmp_amount: 40.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'InvestorGain Market Estimates',
-    source_url: 'https://www.investorgain.com',
-    observed_at: new Date(Date.now() - 30 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 30 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Capital markets momentum tailwind',
-    created_at: new Date(Date.now() - 30 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '66666666-6666-6666-6666-666666660028',
-    ipo_id: '44444444-4444-4444-4444-444444440019',
-    gmp_amount: 48.0,
-    currency: 'INR',
-    unit: 'per share',
-    source_name: 'IPOWatch Market Research',
-    source_url: 'https://ipowatch.in',
-    observed_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_by: 'system_sync',
-    notes: 'Leadership reputation under Dharmesh Mehta',
-    created_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-  },
-];
-
-// Initial Subscriptions
-const INITIAL_SUBSCRIPTIONS: SubscriptionSnapshot[] = [
-  // Jio Platforms Limited (Day 1 - Reliance Jio)
-  {
-    id: '77777777-7777-7777-7777-777777770019',
-    ipo_id: '44444444-4444-4444-4444-444444440020',
-    retail_multiple: 0.62,
-    nii_multiple: 1.84,
-    qib_multiple: 0.45,
-    employee_multiple: 0.95,
-    shareholder_multiple: 0.0,
-    total_multiple: 0.88,
-    unit: 'times',
-    day_number: 1,
-    observed_at: new Date(Date.now() - 25 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 25 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 25 * 3600 * 1000).toISOString(),
-  },
-  // Jio Platforms Limited (Day 2 LIVE NOW - Reliance Jio)
-  {
-    id: '77777777-7777-7777-7777-777777770020',
-    ipo_id: '44444444-4444-4444-4444-444444440020',
-    retail_multiple: 1.35,
-    nii_multiple: 5.80,
-    qib_multiple: 9.80,
-    employee_multiple: 2.10,
-    shareholder_multiple: 0.0,
-    total_multiple: 4.35,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-  },
-  // Paras Healthcare Limited (Day 1)
-  {
-    id: '77777777-7777-7777-7777-777777770027',
-    ipo_id: '44444444-4444-4444-4444-444444440021',
-    retail_multiple: 1.15,
-    nii_multiple: 1.45,
-    qib_multiple: 0.28,
-    employee_multiple: 0.50,
-    shareholder_multiple: 0.0,
-    total_multiple: 0.95,
-    unit: 'times',
-    day_number: 1,
-    observed_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
-  },
-  // Paras Healthcare Limited (Day 2 LIVE NOW)
-  {
-    id: '77777777-7777-7777-7777-777777770021',
-    ipo_id: '44444444-4444-4444-4444-444444440021',
-    retail_multiple: 2.40,
-    nii_multiple: 3.80,
-    qib_multiple: 1.95,
-    employee_multiple: 1.05,
-    shareholder_multiple: 0.0,
-    total_multiple: 2.65,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Acme India Industries Limited (Day 2 LIVE NOW)
-  {
-    id: '77777777-7777-7777-7777-777777770022',
-    ipo_id: '44444444-4444-4444-4444-444444440022',
-    retail_multiple: 8.50,
-    nii_multiple: 14.20,
-    qib_multiple: 3.40,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 8.10,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Tonbo Imaging Limited (Final Subscribed)
-  {
-    id: '77777777-7777-7777-7777-777777770025',
-    ipo_id: '44444444-4444-4444-4444-444444440025',
-    retail_multiple: 16.80,
-    nii_multiple: 56.40,
-    qib_multiple: 88.50,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 42.60,
-    unit: 'times',
-    day_number: 3,
-    observed_at: new Date(Date.now() - 10 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 10 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 10 * 3600 * 1000).toISOString(),
-  },
-  // Bonfiglioli Transmissions Limited (Final Subscribed)
-  {
-    id: '77777777-7777-7777-7777-777777770024',
-    ipo_id: '44444444-4444-4444-4444-444444440024',
-    retail_multiple: 7.42,
-    nii_multiple: 18.50,
-    qib_multiple: 28.20,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 14.85,
-    unit: 'times',
-    day_number: 3,
-    observed_at: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 12 * 3600 * 1000).toISOString(),
-  },
-  // Danish Power Limited (SME Emerge Final)
-  {
-    id: '77777777-7777-7777-7777-777777770028',
-    ipo_id: '44444444-4444-4444-4444-444444440028',
-    retail_multiple: 64.20,
-    nii_multiple: 144.50,
-    qib_multiple: 112.00,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 88.50,
-    unit: 'times',
-    day_number: 3,
-    observed_at: new Date(Date.now() - 14 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 14 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 14 * 3600 * 1000).toISOString(),
-  },
-  // United Heat Transfer Limited (SME Emerge Day 2)
-  {
-    id: '77777777-7777-7777-7777-777777770029',
-    ipo_id: '44444444-4444-4444-4444-444444440029',
-    retail_multiple: 15.60,
-    nii_multiple: 24.10,
-    qib_multiple: 0.0,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 18.20,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Deepak Builders & Engineers Limited (Final)
-  {
-    id: '77777777-7777-7777-7777-777777770030',
-    ipo_id: '44444444-4444-4444-4444-444444440030',
-    retail_multiple: 12.50,
-    nii_multiple: 42.80,
-    qib_multiple: 36.40,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 24.10,
-    unit: 'times',
-    day_number: 3,
-    observed_at: new Date(Date.now() - 16 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 16 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 16 * 3600 * 1000).toISOString(),
-  },
-  // Ventive Hospitality (Day 2)
-  {
-    id: '77777777-7777-7777-7777-777777770010',
-    ipo_id: '44444444-4444-4444-4444-444444440013',
-    retail_multiple: 2.85,
-    nii_multiple: 4.12,
-    qib_multiple: 1.45,
-    employee_multiple: 1.10,
-    shareholder_multiple: 0.0,
-    total_multiple: 2.65,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Senores Pharmaceuticals (Day 1)
-  {
-    id: '77777777-7777-7777-7777-777777770011',
-    ipo_id: '44444444-4444-4444-4444-444444440014',
-    retail_multiple: 5.42,
-    nii_multiple: 8.90,
-    qib_multiple: 2.10,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 4.80,
-    unit: 'times',
-    day_number: 1,
-    observed_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-  },
-  // Carraro India (Day 2)
-  {
-    id: '77777777-7777-7777-7777-777777770012',
-    ipo_id: '44444444-4444-4444-4444-444444440015',
-    retail_multiple: 1.95,
-    nii_multiple: 3.20,
-    qib_multiple: 1.15,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 1.85,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Unimech Aerospace (Day 2)
-  {
-    id: '77777777-7777-7777-7777-777777770013',
-    ipo_id: '44444444-4444-4444-4444-444444440016',
-    retail_multiple: 7.15,
-    nii_multiple: 12.40,
-    qib_multiple: 3.50,
-    employee_multiple: 2.40,
-    shareholder_multiple: 0.0,
-    total_multiple: 6.85,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 1 * 3600 * 1000).toISOString(),
-  },
-  // Enviro Infra Engineers (Day 2)
-  {
-    id: '77777777-7777-7777-7777-777777770001',
-    ipo_id: '44444444-4444-4444-4444-444444440007',
-    retail_multiple: 16.42,
-    nii_multiple: 31.85,
-    qib_multiple: 5.12,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 16.78,
-    unit: 'times',
-    day_number: 2,
-    observed_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-  // Rajputana Biodiesel (Day 1 SME)
-  {
-    id: '77777777-7777-7777-7777-777777770002',
-    ipo_id: '44444444-4444-4444-4444-444444440008',
-    retail_multiple: 38.6,
-    nii_multiple: 22.1,
-    qib_multiple: 2.4,
-    employee_multiple: 0.0,
-    shareholder_multiple: 0.0,
-    total_multiple: 24.35,
-    unit: 'times',
-    day_number: 1,
-    observed_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    ingested_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    verification_status: 'verified',
-    created_at: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-  },
-  // NTPC Green Energy (Final)
-  {
-    id: '77777777-7777-7777-7777-777777770014',
-    ipo_id: '44444444-4444-4444-4444-444444440012',
-    retail_multiple: 3.44,
-    nii_multiple: 4.83,
-    qib_multiple: 3.32,
-    employee_multiple: 3.80,
-    shareholder_multiple: 0.0,
-    total_multiple: 3.36,
-    unit: 'times',
-    day_number: 3,
-    observed_at: '2024-11-22T17:00:00Z',
-    ingested_at: '2024-11-22T17:10:00Z',
-    verification_status: 'verified',
-    created_at: '2024-11-22T17:10:00Z',
-  },
-  // Historical Premier Energies Progression
-  {
-    id: '77777777-7777-7777-7777-777777770041',
-    ipo_id: '44444444-4444-4444-4444-444444440003',
-    retail_multiple: 1.90,
-    nii_multiple: 5.30,
-    qib_multiple: 0.15,
-    employee_multiple: 2.10,
-    shareholder_multiple: 0.0,
-    total_multiple: 2.16,
-    unit: 'times',
-    day_number: 1,
-    observed_at: '2024-08-27T17:00:00Z',
-    ingested_at: '2024-08-27T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-08-27T17:05:00Z',
-  },
-  {
-    id: '77777777-7777-7777-7777-777777770042',
-    ipo_id: '44444444-4444-4444-4444-444444440003',
-    retail_multiple: 4.15,
-    nii_multiple: 19.80,
-    qib_multiple: 1.42,
-    employee_multiple: 5.20,
-    shareholder_multiple: 0.0,
-    total_multiple: 6.61,
-    unit: 'times',
-    day_number: 2,
-    observed_at: '2024-08-28T17:00:00Z',
-    ingested_at: '2024-08-28T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-08-28T17:05:00Z',
-  },
-  {
-    id: '77777777-7777-7777-7777-777777770043',
-    ipo_id: '44444444-4444-4444-4444-444444440003',
-    retail_multiple: 7.69,
-    nii_multiple: 50.04,
-    qib_multiple: 216.40,
-    employee_multiple: 11.45,
-    shareholder_multiple: 0.0,
-    total_multiple: 74.38,
-    unit: 'times',
-    day_number: 3,
-    observed_at: '2024-08-29T17:00:00Z',
-    ingested_at: '2024-08-29T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-08-29T17:05:00Z',
-  },
-  // Historical Waaree Day 1 & Day 2
-  {
-    id: '77777777-7777-7777-7777-777777770044',
-    ipo_id: '44444444-4444-4444-4444-444444440001',
-    retail_multiple: 3.17,
-    nii_multiple: 8.04,
-    qib_multiple: 0.08,
-    employee_multiple: 1.54,
-    shareholder_multiple: 0.0,
-    total_multiple: 3.32,
-    unit: 'times',
-    day_number: 1,
-    observed_at: '2024-10-21T17:00:00Z',
-    ingested_at: '2024-10-21T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-10-21T17:05:00Z',
-  },
-  {
-    id: '77777777-7777-7777-7777-777777770045',
-    ipo_id: '44444444-4444-4444-4444-444444440001',
-    retail_multiple: 6.38,
-    nii_multiple: 24.32,
-    qib_multiple: 1.72,
-    employee_multiple: 3.10,
-    shareholder_multiple: 0.0,
-    total_multiple: 8.98,
-    unit: 'times',
-    day_number: 2,
-    observed_at: '2024-10-22T17:00:00Z',
-    ingested_at: '2024-10-22T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-10-22T17:05:00Z',
-  },
-  // Historical Waaree Final
-  {
-    id: '77777777-7777-7777-7777-777777770004',
-    ipo_id: '44444444-4444-4444-4444-444444440001',
-    retail_multiple: 10.79,
-    nii_multiple: 62.48,
-    qib_multiple: 208.63,
-    employee_multiple: 5.17,
-    shareholder_multiple: 0.0,
-    total_multiple: 76.34,
-    unit: 'times',
-    day_number: 3,
-    observed_at: '2024-10-23T17:00:00Z',
-    ingested_at: '2024-10-23T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-10-23T17:05:00Z',
-  },
-  // Historical Swiggy Day 1 & Day 2
-  {
-    id: '77777777-7777-7777-7777-777777770046',
-    ipo_id: '44444444-4444-4444-4444-444444440005',
-    retail_multiple: 0.54,
-    nii_multiple: 0.14,
-    qib_multiple: 0.08,
-    employee_multiple: 0.74,
-    shareholder_multiple: 0.0,
-    total_multiple: 0.35,
-    unit: 'times',
-    day_number: 1,
-    observed_at: '2024-11-06T17:00:00Z',
-    ingested_at: '2024-11-06T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-11-06T17:05:00Z',
-  },
-  {
-    id: '77777777-7777-7777-7777-777777770047',
-    ipo_id: '44444444-4444-4444-4444-444444440005',
-    retail_multiple: 0.84,
-    nii_multiple: 0.25,
-    qib_multiple: 0.28,
-    employee_multiple: 1.15,
-    shareholder_multiple: 0.0,
-    total_multiple: 0.56,
-    unit: 'times',
-    day_number: 2,
-    observed_at: '2024-11-07T17:00:00Z',
-    ingested_at: '2024-11-07T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-11-07T17:05:00Z',
-  },
-  // Historical Swiggy Final
-  {
-    id: '77777777-7777-7777-7777-777777770005',
-    ipo_id: '44444444-4444-4444-4444-444444440005',
-    retail_multiple: 1.14,
-    nii_multiple: 0.41,
-    qib_multiple: 6.02,
-    employee_multiple: 1.65,
-    shareholder_multiple: 0.0,
-    total_multiple: 3.59,
-    unit: 'times',
-    day_number: 3,
-    observed_at: '2024-11-08T17:00:00Z',
-    ingested_at: '2024-11-08T17:05:00Z',
-    verification_status: 'verified',
-    created_at: '2024-11-08T17:05:00Z',
-  },
-];
-
-// Initial Admin Users
-const INITIAL_ADMINS: AdminUser[] = [
-  {
-    id: '22222222-2222-2222-2222-222222220001',
-    email: 'milanpatadia8@gmail.com',
-    role: 'admin',
-    full_name: 'Milan Patadia',
-    is_active: true,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: '22222222-2222-2222-2222-222222220002',
-    email: 'editor@ipotracker.in',
-    role: 'editor',
-    full_name: 'Senior Research Analyst',
-    is_active: true,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: '22222222-2222-2222-2222-222222220003',
-    email: 'auditor@ipotracker.in',
-    role: 'reviewer',
-    full_name: 'Compliance Officer',
-    is_active: true,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-];
-
-// Initial Feed Runs
-const INITIAL_FEED_RUNS: FeedRun[] = [
-  {
-    id: '88888888-8888-8888-8888-888888880001',
-    source_id: '11111111-1111-1111-1111-111111110001',
-    provider_name: 'NSE Official Ingestion Feed',
-    job_type: 'ipo_discovery',
-    started_at: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-    finished_at: new Date(Date.now() - 34 * 60 * 1000).toISOString(),
-    status: 'success',
-    records_fetched: 12,
-    records_accepted: 12,
-    records_rejected: 0,
-    error_summary: undefined,
-    created_at: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-  },
-  {
-    id: '88888888-8888-8888-8888-888888880002',
-    source_id: '11111111-1111-1111-1111-111111110004',
-    provider_name: 'InvestorGain Market Estimates',
-    job_type: 'gmp_sync',
-    started_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    finished_at: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
-    status: 'success',
-    records_fetched: 8,
-    records_accepted: 8,
-    records_rejected: 0,
-    error_summary: undefined,
-    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-  },
-  {
-    id: '88888888-8888-8888-8888-888888880003',
-    source_id: '11111111-1111-1111-1111-111111110002',
-    provider_name: 'BSE Listing & Public Offerings',
-    job_type: 'subscription_sync',
-    started_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    finished_at: new Date(Date.now() - 59 * 60 * 1000).toISOString(),
-    status: 'success',
-    records_fetched: 5,
-    records_accepted: 5,
-    records_rejected: 0,
-    error_summary: undefined,
-    created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-  },
-];
-
-// Initial Audit Logs
-const INITIAL_AUDIT_LOGS: AuditLog[] = [
-  {
-    id: '99999999-9999-9999-9999-999999990001',
-    actor_id: '22222222-2222-2222-2222-222222220001',
-    actor_name: 'Milan Patadia',
-    action: 'SYSTEM_INITIALIZE',
-    entity_type: 'system',
-    entity_id: 'schema_boot',
-    before_values: null,
-    after_values: { message: 'Database initialized with verified Indian IPO fixtures' },
-    created_at: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: '99999999-9999-9999-9999-999999990002',
-    actor_id: '22222222-2222-2222-2222-222222220002',
-    actor_name: 'Senior Research Analyst',
-    action: 'GMP_UPDATE_VERIFIED',
-    entity_type: 'gmp_snapshot',
-    entity_id: 'enviro-infra-engineers-ipo',
-    before_values: { gmp_amount: 41 },
-    after_values: { gmp_amount: 44, source: 'InvestorGain' },
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-  },
-];
+// Clean production store — zero pre-seeded companies, IPOs, GMPs, subscriptions, or logs
+const INITIAL_COMPANIES: Company[] = [];
+const INITIAL_IPOS: IPO[] = [];
+const INITIAL_LISTING_RESULTS: ListingResult[] = [];
+const INITIAL_GMP_SNAPSHOTS: GMPSnapshot[] = [];
+const INITIAL_SUBSCRIPTIONS: SubscriptionSnapshot[] = [];
+const INITIAL_ADMINS: AdminUser[] = [];
+const INITIAL_FEED_RUNS: FeedRun[] = [];
+const INITIAL_AUDIT_LOGS: AuditLog[] = [];
 
 class IPODataStore {
   private companies: Map<string, Company> = new Map();
@@ -2735,13 +197,13 @@ class IPODataStore {
   private feedRuns: FeedRun[] = [];
   private auditLogs: AuditLog[] = [];
   private adminUsers: Map<string, AdminUser> = new Map();
+  private clients: Map<string, ClientRecord> = new Map();
 
   constructor() {
     this.seed();
   }
 
   private seed() {
-    // Populate maps
     INITIAL_COMPANIES.forEach((c) => this.companies.set(c.id, { ...c }));
     INITIAL_SOURCES.forEach((s) => this.sources.set(s.id, { ...s }));
     INITIAL_ADMINS.forEach((u) => this.adminUsers.set(u.id, { ...u }));
@@ -2809,10 +271,16 @@ class IPODataStore {
           case 'gain_desc':
             list.sort((a, b) => {
               const gainA = a.listing_result
-                ? calculateListingGainPercentage(a.listing_result.issue_price, a.listing_result.listing_price)
+                ? calculateListingGainPercentage(
+                    a.listing_result.issue_price,
+                    a.listing_result.listing_price
+                  )
                 : -9999;
               const gainB = b.listing_result
-                ? calculateListingGainPercentage(b.listing_result.issue_price, b.listing_result.listing_price)
+                ? calculateListingGainPercentage(
+                    b.listing_result.issue_price,
+                    b.listing_result.listing_price
+                  )
                 : -9999;
               return gainB - gainA;
             });
@@ -2820,10 +288,16 @@ class IPODataStore {
           case 'gain_asc':
             list.sort((a, b) => {
               const gainA = a.listing_result
-                ? calculateListingGainPercentage(a.listing_result.issue_price, a.listing_result.listing_price)
+                ? calculateListingGainPercentage(
+                    a.listing_result.issue_price,
+                    a.listing_result.listing_price
+                  )
                 : 9999;
               const gainB = b.listing_result
-                ? calculateListingGainPercentage(b.listing_result.issue_price, b.listing_result.listing_price)
+                ? calculateListingGainPercentage(
+                    b.listing_result.issue_price,
+                    b.listing_result.listing_price
+                  )
                 : 9999;
               return gainA - gainB;
             });
@@ -2883,8 +357,18 @@ class IPODataStore {
     // Listing result
     const listing_result = this.listingResults.get(ipo.id);
 
+    // Always derive lifecycle status automatically from entered dates
+    const status = deriveIPOStatusFromDates({
+      open_date: ipo.open_date,
+      close_date: ipo.close_date,
+      listing_date: ipo.listing_date,
+      has_listing_result: Boolean(listing_result),
+      fallback_status: ipo.status,
+    });
+
     return {
       ...ipo,
+      status,
       drhp_url: getValidDocUrl(ipo.drhp_url),
       rhp_url: getValidDocUrl(ipo.rhp_url),
       company,
@@ -2932,7 +416,10 @@ class IPODataStore {
       .filter((i) => i.latest_gmp && (i.status === 'ongoing' || i.status === 'upcoming'))
       .map((i) => {
         const basePrice = i.issue_price || i.price_band_max;
-        const indicativeGainPct = calculateIndicativeGainPercentage(basePrice, i.latest_gmp?.gmp_amount);
+        const indicativeGainPct = calculateIndicativeGainPercentage(
+          basePrice,
+          i.latest_gmp?.gmp_amount
+        );
         return {
           id: i.id,
           company_name: i.company?.name || i.slug,
@@ -2981,6 +468,14 @@ class IPODataStore {
       issue_size?: number;
       fresh_issue_size?: number;
       offer_for_sale_size?: number;
+      retail_quota_percent?: number;
+      qib_quota_percent?: number;
+      nii_quota_percent?: number;
+      employee_quota_percent?: number;
+      shareholder_quota_percent?: number;
+      other_quota_percent?: number;
+      category_lot_limits?: CategoryLotLimitsMap;
+      min_investment_multiples?: MinInvestmentMultiples;
       registrar_name?: string;
       registrar_url?: string;
       drhp_url?: string;
@@ -2993,13 +488,13 @@ class IPODataStore {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)+/g, '');
 
-    const companyId = `comp-${Date.now()}`;
+    const companyId = `comp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const newCompany: Company = {
       id: companyId,
       name: data.companyName,
       slug: companySlug,
-      description: data.description || '',
-      industry: data.industry || 'Diversified',
+      description: data.description?.trim() || undefined,
+      industry: data.industry?.trim() || undefined,
       website_url: '',
       logo_url: '',
       created_at: new Date().toISOString(),
@@ -3008,19 +503,26 @@ class IPODataStore {
     this.companies.set(companyId, newCompany);
 
     const ipoSlug = `${companySlug}-ipo`;
-    const ipoId = `ipo-${Date.now()}`;
+    const ipoId = `ipo-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const computedStatus = deriveIPOStatusFromDates({
+      open_date: data.open_date,
+      close_date: data.close_date,
+      listing_date: data.listing_date,
+      fallback_status: data.status || 'upcoming',
+    });
+
     const newIPO: IPO = {
       id: ipoId,
       company_id: companyId,
       slug: ipoSlug,
       category: data.category,
       exchange: data.exchange,
-      status: data.status,
+      status: computedStatus,
       announcement_status: data.announcement_status,
-      open_date: data.open_date,
-      close_date: data.close_date,
-      allotment_date: data.allotment_date,
-      listing_date: data.listing_date,
+      open_date: data.open_date || undefined,
+      close_date: data.close_date || undefined,
+      allotment_date: data.allotment_date || undefined,
+      listing_date: data.listing_date || undefined,
       price_band_min: data.price_band_min,
       price_band_max: data.price_band_max,
       issue_price: data.issue_price,
@@ -3028,11 +530,16 @@ class IPODataStore {
       issue_size: data.issue_size,
       fresh_issue_size: data.fresh_issue_size,
       offer_for_sale_size: data.offer_for_sale_size,
-      retail_quota_percent: 35.0,
-      qib_quota_percent: 50.0,
-      nii_quota_percent: 15.0,
-      registrar_name: data.registrar_name,
-      registrar_url: data.registrar_url,
+      retail_quota_percent: sanitizeQuotaPercent(data.retail_quota_percent),
+      qib_quota_percent: sanitizeQuotaPercent(data.qib_quota_percent),
+      nii_quota_percent: sanitizeQuotaPercent(data.nii_quota_percent),
+      employee_quota_percent: sanitizeQuotaPercent(data.employee_quota_percent),
+      shareholder_quota_percent: sanitizeQuotaPercent(data.shareholder_quota_percent),
+      other_quota_percent: sanitizeQuotaPercent(data.other_quota_percent),
+      category_lot_limits: sanitizeCategoryLotLimits(data.category_lot_limits),
+      min_investment_multiples: sanitizeMinInvestmentMultiples(data.min_investment_multiples),
+      registrar_name: data.registrar_name?.trim() || undefined,
+      registrar_url: getValidDocUrl(data.registrar_url),
       drhp_url: getValidDocUrl(data.drhp_url),
       rhp_url: getValidDocUrl(data.rhp_url),
       official_source_url: '',
@@ -3080,7 +587,10 @@ class IPODataStore {
     ) {
       const updatedCompany: Company = {
         ...existingCompany,
-        name: companyName !== undefined && companyName.trim() ? companyName.trim() : existingCompany.name,
+        name:
+          companyName !== undefined && companyName.trim()
+            ? companyName.trim()
+            : existingCompany.name,
         description: description !== undefined ? description : existingCompany.description,
         industry: industry !== undefined ? industry : existingCompany.industry,
         updated_at: new Date().toISOString(),
@@ -3092,21 +602,56 @@ class IPODataStore {
     const normalizedUpdates: Partial<IPO> = {};
     for (const [key, val] of Object.entries(ipoUpdates)) {
       if (key === 'id' || key === 'company_id' || key === 'created_at') continue;
-      (normalizedUpdates as Record<string, unknown>)[key] = val === null || val === '' ? undefined : val;
+      if (key === 'category_lot_limits') {
+        normalizedUpdates.category_lot_limits = sanitizeCategoryLotLimits(val);
+        continue;
+      }
+      if (key === 'min_investment_multiples') {
+        normalizedUpdates.min_investment_multiples = sanitizeMinInvestmentMultiples(val);
+        continue;
+      }
+      if (
+        key === 'retail_quota_percent' ||
+        key === 'qib_quota_percent' ||
+        key === 'nii_quota_percent' ||
+        key === 'employee_quota_percent' ||
+        key === 'shareholder_quota_percent' ||
+        key === 'other_quota_percent'
+      ) {
+        normalizedUpdates[key] = sanitizeQuotaPercent(val);
+        continue;
+      }
+      (normalizedUpdates as Record<string, unknown>)[key] =
+        val === null || val === '' ? undefined : val;
     }
 
-    const updated: IPO = {
+    const merged: IPO = {
       ...existing,
       ...normalizedUpdates,
+      registrar_url:
+        'registrar_url' in ipoUpdates
+          ? getValidDocUrl(normalizedUpdates.registrar_url)
+          : existing.registrar_url,
       drhp_url:
-        normalizedUpdates.drhp_url !== undefined
+        'drhp_url' in ipoUpdates
           ? getValidDocUrl(normalizedUpdates.drhp_url)
           : existing.drhp_url,
       rhp_url:
-        normalizedUpdates.rhp_url !== undefined
+        'rhp_url' in ipoUpdates
           ? getValidDocUrl(normalizedUpdates.rhp_url)
           : existing.rhp_url,
       updated_at: new Date().toISOString(),
+    };
+
+    const updated: IPO = {
+      ...merged,
+      status: deriveIPOStatusFromDates({
+        open_date: merged.open_date,
+        close_date: merged.close_date,
+        listing_date: merged.listing_date,
+        has_listing_result: this.listingResults.has(id),
+        fallback_status: merged.status,
+      }),
     };
     this.ipos.set(id, updated);
 
@@ -3136,6 +681,7 @@ class IPODataStore {
 
     const company = this.companies.get(existing.company_id);
     this.ipos.delete(id);
+    this.companies.delete(existing.company_id);
     this.listingResults.delete(id);
     this.gmpSnapshots = this.gmpSnapshots.filter((g) => g.ipo_id !== id);
     this.subscriptionSnapshots = this.subscriptionSnapshots.filter((s) => s.ipo_id !== id);
@@ -3171,8 +717,8 @@ class IPODataStore {
       gmp_amount: data.gmp_amount,
       currency: 'INR',
       unit: 'per share',
-      source_name: data.source_name || 'Manual Admin Quote',
-      source_url: data.source_url,
+      source_name: data.source_name?.trim() || '',
+      source_url: getValidDocUrl(data.source_url),
       observed_at: data.observed_at || new Date().toISOString(),
       ingested_at: new Date().toISOString(),
       verification_status: data.verification_status || 'verified',
@@ -3200,37 +746,90 @@ class IPODataStore {
     return newSnapshot;
   }
 
+  public deleteGMPSnapshot(id: string, actor: { id: string; name: string }): boolean {
+    const idx = this.gmpSnapshots.findIndex((g) => g.id === id);
+    if (idx === -1) return false;
+
+    const [removed] = this.gmpSnapshots.splice(idx, 1);
+
+    this.logAudit({
+      actor_id: actor.id,
+      actor_name: actor.name,
+      action: 'GMP_DELETE',
+      entity_type: 'gmp_snapshot',
+      entity_id: id,
+      before_values: {
+        ipo_id: removed.ipo_id,
+        gmp_amount: removed.gmp_amount,
+        observed_at: removed.observed_at,
+      },
+      after_values: null,
+    });
+
+    return true;
+  }
+
   public addSubscriptionSnapshot(
     data: {
       ipo_id: string;
-      retail_multiple: number;
-      nii_multiple: number;
-      qib_multiple: number;
+      retail_multiple?: number;
+      nii_multiple?: number;
+      qib_multiple?: number;
       employee_multiple?: number;
       shareholder_multiple?: number;
+      total_multiple?: number;
       day_number?: number;
       observed_at?: string;
     },
     actor: { id: string; name: string }
   ): SubscriptionSnapshot {
-    // Total weighted or unweighted composite estimate:
-    // Retail + NII + QIB multiple average weighted approximation
-    const totalMultiple = Number(
-      (
-        data.retail_multiple * 0.35 +
-        data.nii_multiple * 0.15 +
-        data.qib_multiple * 0.5
-      ).toFixed(2)
-    );
+    const parseMultiple = (val: unknown): number => {
+      if (val === undefined || val === null || val === '') return 0;
+      const num = Number(val);
+      return Number.isFinite(num) && num >= 0 ? num : 0;
+    };
+
+    const retailMultiple = parseMultiple(data.retail_multiple);
+    const niiMultiple = parseMultiple(data.nii_multiple);
+    const qibMultiple = parseMultiple(data.qib_multiple);
+    const employeeMultiple = parseMultiple(data.employee_multiple);
+    const shareholderMultiple = parseMultiple(data.shareholder_multiple);
+
+    const hasExplicitTotal =
+      data.total_multiple !== undefined &&
+      data.total_multiple !== null &&
+      String(data.total_multiple) !== '' &&
+      Number.isFinite(Number(data.total_multiple)) &&
+      Number(data.total_multiple) >= 0;
+
+    let totalMultiple: number;
+    if (hasExplicitTotal) {
+      totalMultiple = Number(Number(data.total_multiple).toFixed(2));
+    } else {
+      const ipo = this.ipos.get(data.ipo_id);
+      const rW = ipo?.retail_quota_percent ?? 35;
+      const nW = ipo?.nii_quota_percent ?? 15;
+      const qW = ipo?.qib_quota_percent ?? 50;
+      const weightSum = rW + nW + qW;
+      if (weightSum > 0) {
+        totalMultiple = Number(
+          ((retailMultiple * rW + niiMultiple * nW + qibMultiple * qW) / weightSum).toFixed(2)
+        );
+      } else {
+        totalMultiple = Number(
+          (retailMultiple * 0.35 + niiMultiple * 0.15 + qibMultiple * 0.5).toFixed(2)
+        );
+      }
+    }
 
     const newSnapshot: SubscriptionSnapshot = {
-      id: `sub-${Date.now()}`,
+      id: `sub-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       ipo_id: data.ipo_id,
-      retail_multiple: data.retail_multiple,
-      nii_multiple: data.nii_multiple,
-      qib_multiple: data.qib_multiple,
-      employee_multiple: data.employee_multiple || 0,
-      shareholder_multiple: data.shareholder_multiple || 0,
+      retail_multiple: retailMultiple,
+      nii_multiple: niiMultiple,
+      qib_multiple: qibMultiple,
+      employee_multiple: employeeMultiple,
+      shareholder_multiple: shareholderMultiple,
       total_multiple: totalMultiple,
       unit: 'times',
       day_number: data.day_number || 1,
@@ -3382,17 +981,31 @@ class IPODataStore {
         continue;
       }
 
+      const openDate = colIndex('open_date') >= 0 ? row[colIndex('open_date')] || undefined : undefined;
+      const closeDate = colIndex('close_date') >= 0 ? row[colIndex('close_date')] || undefined : undefined;
+      const listingDate =
+        colIndex('listing_date') >= 0 ? row[colIndex('listing_date')] || undefined : undefined;
+      const resolvedStatus = deriveIPOStatusFromDates({
+        open_date: openDate,
+        close_date: closeDate,
+        listing_date: listingDate,
+        fallback_status: status || 'upcoming',
+      });
+
       if (!options.dryRun) {
         this.createIPO(
           {
             companyName,
             category,
             exchange,
-            status: status || 'upcoming',
+            status: resolvedStatus,
             announcement_status: 'confirmed',
+            open_date: openDate,
+            close_date: closeDate,
+            listing_date: listingDate,
             price_band_min: price || undefined,
             price_band_max: price || undefined,
-            issue_price: status === 'listed' ? price : undefined,
+            issue_price: resolvedStatus === 'listed' ? price : undefined,
             lot_size: lotSize || undefined,
             issue_size: issueSize || undefined,
           },
@@ -3401,21 +1014,23 @@ class IPODataStore {
       }
 
       accepted++;
-      importedIPOs.push({ name: companyName, slug, status: status || 'upcoming' });
+      importedIPOs.push({ name: companyName, slug, status: resolvedStatus });
     }
 
-    this.feedRuns.unshift({
-      id: `import-${Date.now()}`,
-      job_type: 'csv_import',
-      started_at: new Date().toISOString(),
-      finished_at: new Date().toISOString(),
-      status: rejected === 0 ? 'success' : accepted > 0 ? 'partial' : 'failed',
-      records_fetched: lines.length - 1,
-      records_accepted: accepted,
-      records_rejected: rejected,
-      error_summary: errors.length > 0 ? errors.slice(0, 3).join('; ') : undefined,
-      created_at: new Date().toISOString(),
-    });
+    if (!options.dryRun) {
+      this.feedRuns.unshift({
+        id: `import-${Date.now()}`,
+        job_type: 'csv_import',
+        started_at: new Date().toISOString(),
+        finished_at: new Date().toISOString(),
+        status: rejected === 0 ? 'success' : accepted > 0 ? 'partial' : 'failed',
+        records_fetched: lines.length - 1,
+        records_accepted: accepted,
+        records_rejected: rejected,
+        error_summary: errors.length > 0 ? errors.slice(0, 3).join('; ') : undefined,
+        created_at: new Date().toISOString(),
+      });
+    }
 
     return {
       totalRows: lines.length - 1,
@@ -3427,55 +1042,31 @@ class IPODataStore {
   }
 
   // --- Provider Feed Synchronization ---
-  public syncProvider(
-    sourceId: string,
-    actor: { id: string; name: string }
-  ): FeedRun {
+  public syncProvider(sourceId: string, actor: { id: string; name: string }): FeedRun {
     const source = this.sources.get(sourceId);
     const startedAt = new Date().toISOString();
 
-    // Provider synchronization simulation with authentic logic
     let recordsFetched = 0;
     let recordsAccepted = 0;
     let jobType: FeedRun['job_type'] = 'ipo_discovery';
 
+    const ongoingIPOs = Array.from(this.ipos.values()).filter((i) => i.status === 'ongoing');
+
     if (source?.source_type === 'exchange') {
       jobType = 'ipo_discovery';
-      recordsFetched = 4;
-      recordsAccepted = 4;
-      // Mark verified timestamps on ongoing IPOs
-      this.ipos.forEach((ipo) => {
-        if (ipo.status === 'ongoing') {
-          ipo.data_verified_at = new Date().toISOString();
-        }
+      recordsFetched = ongoingIPOs.length;
+      recordsAccepted = ongoingIPOs.length;
+      ongoingIPOs.forEach((ipo) => {
+        ipo.data_verified_at = new Date().toISOString();
       });
     } else if (source?.source_type === 'community_estimate') {
       jobType = 'gmp_sync';
-      recordsFetched = 3;
-      recordsAccepted = 3;
-      // Add a fresh verified quote with timestamp to active ongoing IPO
-      const ongoing = Array.from(this.ipos.values()).find((i) => i.status === 'ongoing');
-      if (ongoing) {
-        const latestGmp = this.gmpSnapshots
-          .filter((g) => g.ipo_id === ongoing.id)
-          .slice(-1)[0]?.gmp_amount || 40;
-        // Small realistic micro fluctuation
-        const delta = Math.random() > 0.5 ? 1 : -1;
-        this.addGMPSnapshot(
-          {
-            ipo_id: ongoing.id,
-            gmp_amount: Math.max(5, latestGmp + delta),
-            source_name: source.provider_name,
-            source_url: source.base_url,
-            notes: 'Automated periodic sync observation',
-          },
-          actor
-        );
-      }
+      recordsFetched = ongoingIPOs.length;
+      recordsAccepted = ongoingIPOs.length;
     } else if (source?.source_type === 'registrar') {
       jobType = 'subscription_sync';
-      recordsFetched = 2;
-      recordsAccepted = 2;
+      recordsFetched = ongoingIPOs.length;
+      recordsAccepted = ongoingIPOs.length;
     }
 
     const finishedAt = new Date().toISOString();
@@ -3510,6 +1101,432 @@ class IPODataStore {
     });
 
     return run;
+  }
+
+  // --- Client Data & Fee Ledger (Admin Backend) ---
+
+  private computeClientFinancials(
+    agreedRaw: number,
+    payments: ClientFeePayment[],
+    feeWaived?: boolean
+  ): {
+    total_fee_agreed: number;
+    total_fee_paid: number;
+    balance_due: number;
+    fee_status: FeePaymentStatus;
+  } {
+    const agreed = Number.isFinite(agreedRaw) && agreedRaw >= 0 ? Number(agreedRaw.toFixed(2)) : 0;
+    const paid = Number(
+      payments.reduce((sum, p) => sum + (Number.isFinite(p.amount) ? p.amount : 0), 0).toFixed(2)
+    );
+    const balance = Number(Math.max(0, agreed - paid).toFixed(2));
+
+    let fee_status: FeePaymentStatus;
+    if (feeWaived || (agreed === 0 && paid === 0)) {
+      fee_status = 'waived';
+    } else if (paid >= agreed) {
+      fee_status = 'paid';
+    } else if (paid > 0) {
+      fee_status = 'partial';
+    } else {
+      fee_status = 'pending';
+    }
+
+    return {
+      total_fee_agreed: agreed,
+      total_fee_paid: paid,
+      balance_due: balance,
+      fee_status,
+    };
+  }
+
+  public getAllClients(): ClientRecord[] {
+    return Array.from(this.clients.values())
+      .map((c) => ({ ...c, payments: [...c.payments] }))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  public getClientById(id: string): ClientRecord | undefined {
+    const found = this.clients.get(id);
+    if (!found) return undefined;
+    return { ...found, payments: [...found.payments] };
+  }
+
+  public createClient(
+    data: {
+      full_name: string;
+      email?: string;
+      phone?: string;
+      pan?: string;
+      demat_id?: string;
+      client_code?: string;
+      service_plan?: string;
+      status?: ClientStatus;
+      total_fee_agreed?: number;
+      initial_fee_paid?: number;
+      initial_payment_mode?: PaymentMode;
+      initial_payment_date?: string;
+      initial_payment_ref?: string;
+      fee_waived?: boolean;
+      fee_due_date?: string;
+      notes?: string;
+      joined_date?: string;
+    },
+    actor: { id: string; name: string }
+  ): ClientRecord {
+    const cleanName = String(data.full_name || '').trim().slice(0, 120);
+    if (cleanName.length < 2) {
+      throw new Error('Client full name is required (at least 2 characters).');
+    }
+
+    const cleanEmail = data.email ? String(data.email).trim().toLowerCase().slice(0, 254) : undefined;
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw new Error('Please enter a valid client email address.');
+    }
+
+    const cleanPan = data.pan ? String(data.pan).trim().toUpperCase().slice(0, 10) : undefined;
+    if (cleanPan && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+      throw new Error('PAN must be a valid 10-character format (e.g. ABCDE1234F).');
+    }
+
+    const cleanPhone = data.phone ? String(data.phone).trim().slice(0, 20) : undefined;
+    const nowIso = new Date().toISOString();
+    const todayDate = nowIso.slice(0, 10);
+    const id = `cli-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const payments: ClientFeePayment[] = [];
+    const initialPaid = Number(data.initial_fee_paid || 0);
+    if (Number.isFinite(initialPaid) && initialPaid > 0) {
+      payments.push({
+        id: `pay-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        amount: Number(initialPaid.toFixed(2)),
+        payment_date: (data.initial_payment_date || todayDate).slice(0, 10),
+        payment_mode: data.initial_payment_mode || 'UPI',
+        reference_no: data.initial_payment_ref
+          ? String(data.initial_payment_ref).trim().slice(0, 80)
+          : undefined,
+        description: 'Initial fee payment',
+        recorded_by: actor.name,
+        created_at: nowIso,
+      });
+    }
+
+    const allowedStatuses = new Set<ClientStatus>(['active', 'inactive', 'lead', 'suspended']);
+    const status: ClientStatus =
+      data.status && allowedStatuses.has(data.status) ? data.status : 'active';
+
+    const financials = this.computeClientFinancials(
+      Number(data.total_fee_agreed || 0),
+      payments,
+      Boolean(data.fee_waived)
+    );
+
+    const record: ClientRecord = {
+      id,
+      full_name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      pan: cleanPan,
+      demat_id: data.demat_id ? String(data.demat_id).trim().slice(0, 40) : undefined,
+      client_code: data.client_code ? String(data.client_code).trim().slice(0, 40) : undefined,
+      service_plan: data.service_plan ? String(data.service_plan).trim().slice(0, 80) : undefined,
+      status,
+      ...financials,
+      fee_waived: Boolean(data.fee_waived),
+      fee_due_date: data.fee_due_date ? String(data.fee_due_date).trim().slice(0, 10) : undefined,
+      payments,
+      notes: data.notes ? String(data.notes).trim().slice(0, 1000) : undefined,
+      joined_date: (data.joined_date || todayDate).slice(0, 10),
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    this.clients.set(id, record);
+
+    this.logAudit({
+      actor_id: actor.id,
+      actor_name: actor.name,
+      action: 'CLIENT_CREATE',
+      entity_type: 'client',
+      entity_id: id,
+      before_values: null,
+      after_values: {
+        full_name: record.full_name,
+        total_fee_agreed: record.total_fee_agreed,
+        total_fee_paid: record.total_fee_paid,
+        fee_status: record.fee_status,
+      },
+    });
+
+    return { ...record, payments: [...record.payments] };
+  }
+
+  public updateClient(
+    id: string,
+    updates: Partial<{
+      full_name: string;
+      email: string | null;
+      phone: string | null;
+      pan: string | null;
+      demat_id: string | null;
+      client_code: string | null;
+      service_plan: string | null;
+      status: ClientStatus;
+      total_fee_agreed: number;
+      fee_waived: boolean;
+      fee_due_date: string | null;
+      notes: string | null;
+      joined_date: string;
+    }>,
+    actor: { id: string; name: string }
+  ): ClientRecord | undefined {
+    const existing = this.clients.get(id);
+    if (!existing) return undefined;
+
+    const nextName =
+      updates.full_name !== undefined
+        ? String(updates.full_name).trim().slice(0, 120)
+        : existing.full_name;
+    if (nextName.length < 2) {
+      throw new Error('Client full name must be at least 2 characters.');
+    }
+
+    const nextEmail =
+      updates.email !== undefined
+        ? updates.email
+          ? String(updates.email).trim().toLowerCase().slice(0, 254)
+          : undefined
+        : existing.email;
+    if (nextEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
+      throw new Error('Please enter a valid client email address.');
+    }
+
+    const nextPan =
+      updates.pan !== undefined
+        ? updates.pan
+          ? String(updates.pan).trim().toUpperCase().slice(0, 10)
+          : undefined
+        : existing.pan;
+    if (nextPan && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(nextPan)) {
+      throw new Error('PAN must be a valid 10-character format (e.g. ABCDE1234F).');
+    }
+
+    const allowedStatuses = new Set<ClientStatus>(['active', 'inactive', 'lead', 'suspended']);
+    const nextStatus =
+      updates.status && allowedStatuses.has(updates.status) ? updates.status : existing.status;
+
+    const nextAgreed =
+      updates.total_fee_agreed !== undefined
+        ? Number(updates.total_fee_agreed)
+        : existing.total_fee_agreed;
+    const nextWaived =
+      updates.fee_waived !== undefined ? Boolean(updates.fee_waived) : existing.fee_waived;
+
+    const financials = this.computeClientFinancials(nextAgreed, existing.payments, nextWaived);
+
+    const updated: ClientRecord = {
+      ...existing,
+      full_name: nextName,
+      email: nextEmail,
+      phone:
+        updates.phone !== undefined
+          ? updates.phone
+            ? String(updates.phone).trim().slice(0, 20)
+            : undefined
+          : existing.phone,
+      pan: nextPan,
+      demat_id:
+        updates.demat_id !== undefined
+          ? updates.demat_id
+            ? String(updates.demat_id).trim().slice(0, 40)
+            : undefined
+          : existing.demat_id,
+      client_code:
+        updates.client_code !== undefined
+          ? updates.client_code
+            ? String(updates.client_code).trim().slice(0, 40)
+            : undefined
+          : existing.client_code,
+      service_plan:
+        updates.service_plan !== undefined
+          ? updates.service_plan
+            ? String(updates.service_plan).trim().slice(0, 80)
+            : undefined
+          : existing.service_plan,
+      status: nextStatus,
+      ...financials,
+      fee_waived: nextWaived,
+      fee_due_date:
+        updates.fee_due_date !== undefined
+          ? updates.fee_due_date
+            ? String(updates.fee_due_date).trim().slice(0, 10)
+            : undefined
+          : existing.fee_due_date,
+      notes:
+        updates.notes !== undefined
+          ? updates.notes
+            ? String(updates.notes).trim().slice(0, 1000)
+            : undefined
+          : existing.notes,
+      joined_date:
+        updates.joined_date && String(updates.joined_date).trim()
+          ? String(updates.joined_date).trim().slice(0, 10)
+          : existing.joined_date,
+      updated_at: new Date().toISOString(),
+    };
+
+    this.clients.set(id, updated);
+
+    this.logAudit({
+      actor_id: actor.id,
+      actor_name: actor.name,
+      action: 'CLIENT_UPDATE',
+      entity_type: 'client',
+      entity_id: id,
+      before_values: {
+        full_name: existing.full_name,
+        total_fee_agreed: existing.total_fee_agreed,
+        fee_status: existing.fee_status,
+      },
+      after_values: {
+        full_name: updated.full_name,
+        total_fee_agreed: updated.total_fee_agreed,
+        fee_status: updated.fee_status,
+      },
+    });
+
+    return { ...updated, payments: [...updated.payments] };
+  }
+
+  public deleteClient(id: string, actor: { id: string; name: string }): boolean {
+    const existing = this.clients.get(id);
+    if (!existing) return false;
+    this.clients.delete(id);
+
+    this.logAudit({
+      actor_id: actor.id,
+      actor_name: actor.name,
+      action: 'CLIENT_DELETE',
+      entity_type: 'client',
+      entity_id: id,
+      before_values: { full_name: existing.full_name },
+      after_values: null,
+    });
+    return true;
+  }
+
+  public addClientPayment(
+    clientId: string,
+    data: {
+      amount: number;
+      payment_date?: string;
+      payment_mode?: PaymentMode;
+      reference_no?: string;
+      description?: string;
+    },
+    actor: { id: string; name: string }
+  ): ClientRecord | undefined {
+    const existing = this.clients.get(clientId);
+    if (!existing) return undefined;
+
+    const amount = Number(data.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000000) {
+      throw new Error('Payment amount must be a positive number.');
+    }
+
+    const allowedModes = new Set<PaymentMode>([
+      'UPI',
+      'NEFT/IMPS',
+      'Bank Transfer',
+      'Card',
+      'Cash',
+      'Cheque',
+      'Other',
+    ]);
+    const mode: PaymentMode =
+      data.payment_mode && allowedModes.has(data.payment_mode) ? data.payment_mode : 'UPI';
+
+    const nowIso = new Date().toISOString();
+    const payment: ClientFeePayment = {
+      id: `pay-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      amount: Number(amount.toFixed(2)),
+      payment_date: (data.payment_date || nowIso.slice(0, 10)).slice(0, 10),
+      payment_mode: mode,
+      reference_no: data.reference_no ? String(data.reference_no).trim().slice(0, 80) : undefined,
+      description: data.description ? String(data.description).trim().slice(0, 200) : undefined,
+      recorded_by: actor.name,
+      created_at: nowIso,
+    };
+
+    const nextPayments = [payment, ...existing.payments];
+    const financials = this.computeClientFinancials(
+      existing.total_fee_agreed,
+      nextPayments,
+      existing.fee_waived
+    );
+
+    const updated: ClientRecord = {
+      ...existing,
+      ...financials,
+      payments: nextPayments,
+      updated_at: nowIso,
+    };
+    this.clients.set(clientId, updated);
+
+    this.logAudit({
+      actor_id: actor.id,
+      actor_name: actor.name,
+      action: 'CLIENT_PAYMENT_ADD',
+      entity_type: 'client',
+      entity_id: clientId,
+      before_values: { total_fee_paid: existing.total_fee_paid },
+      after_values: {
+        payment_amount: payment.amount,
+        payment_mode: payment.payment_mode,
+        total_fee_paid: updated.total_fee_paid,
+      },
+    });
+
+    return { ...updated, payments: [...updated.payments] };
+  }
+
+  public deleteClientPayment(
+    clientId: string,
+    paymentId: string,
+    actor: { id: string; name: string }
+  ): ClientRecord | undefined {
+    const existing = this.clients.get(clientId);
+    if (!existing) return undefined;
+
+    const removed = existing.payments.find((p) => p.id === paymentId);
+    if (!removed) return undefined;
+
+    const nextPayments = existing.payments.filter((p) => p.id !== paymentId);
+    const financials = this.computeClientFinancials(
+      existing.total_fee_agreed,
+      nextPayments,
+      existing.fee_waived
+    );
+
+    const updated: ClientRecord = {
+      ...existing,
+      ...financials,
+      payments: nextPayments,
+      updated_at: new Date().toISOString(),
+    };
+    this.clients.set(clientId, updated);
+
+    this.logAudit({
+      actor_id: actor.id,
+      actor_name: actor.name,
+      action: 'CLIENT_PAYMENT_DELETE',
+      entity_type: 'client',
+      entity_id: clientId,
+      before_values: { removed_payment_amount: removed.amount },
+      after_values: { total_fee_paid: updated.total_fee_paid },
+    });
+
+    return { ...updated, payments: [...updated.payments] };
   }
 
   // --- Observability & Metadata ---

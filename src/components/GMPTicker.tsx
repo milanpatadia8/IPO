@@ -29,7 +29,7 @@ export const GMPTicker: React.FC<GMPTickerProps> = ({ ipos, navigate }) => {
         <div className="flex items-center gap-1.5 shrink-0 pr-3 border-r border-[#e0e0e0]">
           <span className="w-2 h-2 rounded-full bg-[#2e7d32] animate-pulse" />
           <span className="text-[11px] font-medium uppercase tracking-wider text-[#424242]">
-            Live GMP Radar
+            Unlisted Price Radar
           </span>
         </div>
 
@@ -70,12 +70,12 @@ export const GMPTicker: React.FC<GMPTickerProps> = ({ ipos, navigate }) => {
           })}
         </div>
 
-        {/* View All GMP Link */}
+        {/* View All Unlisted Prices Link */}
         <button
-          onClick={() => navigate('/ipo/gmp')}
+          onClick={() => navigate('/ipo/unlisted-price')}
           className="shrink-0 text-[11px] font-medium text-[#387ed1] hover:underline flex items-center gap-0.5 pl-2"
         >
-          <span>All GMP</span>
+          <span>All Unlisted Prices</span>
           <ChevronRight className="w-3 h-3" />
         </button>
       </div>

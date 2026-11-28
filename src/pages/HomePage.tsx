@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, ArrowRight, Calculator, CheckCircle2 } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { IPO, IPOCategory } from '../types/ipo';
 import { api } from '../lib/api';
-import { getSavedPANCount } from '../components/AllotmentCheckerModal';
 import {
   formatCrores,
   calculateDaysRemaining,
-  calculateMinApplication,
+  getEffectiveMinInvestment,
   calculateListingGainPercentage,
   calculateIndicativeGainPercentage,
   formatIndianDate,
 } from '../lib/calculations';
+import { useSitePageContent } from '../lib/siteContent';
+import { PageNoticeBanner, PageExtraSections } from '../components/PageCustomSections';
 
 interface HomePageProps {
   navigate: (route: string) => void;
@@ -25,16 +26,12 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenAllotment,
   onOpenCommandPalette,
 }) => {
+  const pageContent = useSitePageContent('home');
   const [ipos, setIPOs] = useState<IPO[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusTab, setStatusTab] = useState<StatusTab>('ongoing');
   const [categoryFilter, setCategoryFilter] = useState<IPOCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [savedPanCount, setSavedPanCount] = useState(0);
-
-  useEffect(() => {
-    setSavedPanCount(getSavedPANCount());
-  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -88,45 +85,130 @@ export const HomePage: React.FC<HomePageProps> = ({
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 space-y-10">
-      {/* Minimal Hero */}
-      <section className="text-center max-w-2xl mx-auto space-y-5 pt-2">
-        <h1 className="text-3xl sm:text-5xl font-bold text-[#111827] tracking-tight leading-[1.15]">
-          Track IPOs and check allotment in one click.
-        </h1>
-        <p className="text-base sm:text-lg text-[#4B5563] leading-relaxed">
-          Mainboard and SME IPO dates, live subscription multiples, grey market premiums, and saved multi-PAN allotment status in one clean view.
-        </p>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 space-y-8">
+      {/* Warm Editorial Hero Panel */}
+      <section className="rounded-2xl bg-gradient-to-br from-[#FDFBF6] via-[#FAF5EA] to-[#F2ECE0] border border-[#E6DFD3] px-6 py-9 sm:px-10 sm:py-12">
+        <div className="max-w-2xl mx-auto text-center space-y-5">
+          {pageContent.eyebrow && (
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9A5B13]">
+              {pageContent.eyebrow}
+            </div>
+          )}
+          <h1 className="text-3xl sm:text-5xl font-display font-bold text-[#1C1917] tracking-tight leading-[1.12]">
+            {pageContent.title}
+          </h1>
+          {pageContent.subtitle && (
+            <p className="text-base sm:text-lg text-[#57534E] leading-relaxed">
+              {pageContent.subtitle}
+            </p>
+          )}
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => onOpenAllotment?.(undefined)}
+              className="w-full sm:w-auto px-5 py-2.5 bg-[#14532D] hover:bg-[#0F3F22] text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 shadow-xs"
+            >
+              {pageContent.primary_cta_label || 'Check Allotment'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenCommandPalette?.()}
+              className="w-full sm:w-64 px-3.5 py-2.5 bg-white hover:bg-[#FAF7F1] border border-[#DFD6C7] rounded-lg text-sm text-[#57534E] flex items-center justify-between gap-3 transition-colors"
+            >
+              <span className="flex items-center gap-2 truncate">
+                <Search className="w-4 h-4 text-[#78716C] shrink-0" />
+                <span>{pageContent.secondary_cta_label || 'Quick search any IPO...'}</span>
+              </span>
+              <kbd className="text-xs font-mono text-[#78716C] shrink-0">⌘K</kbd>
+            </button>
+          </div>
+        </div>
+
+        {/* Compact Live Market Snapshot Strip */}
+        <div className="mt-8 pt-6 border-t border-[#E6DFD3] grid grid-cols-2 sm:grid-cols-4 gap-3">
           <button
             type="button"
-            onClick={() => onOpenAllotment?.(undefined)}
-            className="w-full sm:w-auto px-5 py-2.5 bg-[#111827] hover:bg-[#1F2937] text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0"
+            onClick={() => setStatusTab('ongoing')}
+            className={`text-left rounded-xl px-4 py-3 border transition-colors ${
+              statusTab === 'ongoing'
+                ? 'bg-[#EEF6F0] border-[#B6DAC0]'
+                : 'bg-white/80 border-[#E6DFD3] hover:bg-white'
+            }`}
           >
-            Check Allotment
+            <div className="text-xs font-medium text-[#57534E]">
+              {pageContent.custom_fields.stat_open_label || 'Open for Bidding'}
+            </div>
+            <div className="text-2xl font-display font-bold text-[#14532D] tabular-nums mt-0.5">
+              {loading ? '—' : counts.ongoing}
+            </div>
           </button>
 
           <button
             type="button"
-            onClick={() => onOpenCommandPalette?.()}
-            className="w-full sm:w-64 px-3.5 py-2.5 bg-white hover:bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg text-sm text-[#4B5563] flex items-center justify-between gap-3 transition-colors"
+            onClick={() => setStatusTab('upcoming')}
+            className={`text-left rounded-xl px-4 py-3 border transition-colors ${
+              statusTab === 'upcoming'
+                ? 'bg-[#FDF6E9] border-[#E6CA9B]'
+                : 'bg-white/80 border-[#E6DFD3] hover:bg-white'
+            }`}
           >
-            <span className="flex items-center gap-2 truncate">
-              <Search className="w-4 h-4 text-[#6B7280] shrink-0" />
-              <span>Quick search any IPO...</span>
-            </span>
-            <kbd className="text-xs text-[#6B7280] shrink-0">⌘K</kbd>
+            <div className="text-xs font-medium text-[#57534E]">
+              {pageContent.custom_fields.stat_upcoming_label || 'Upcoming Pipeline'}
+            </div>
+            <div className="text-2xl font-display font-bold text-[#9A5B13] tabular-nums mt-0.5">
+              {loading ? '—' : counts.upcoming}
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusTab('listed')}
+            className={`text-left rounded-xl px-4 py-3 border transition-colors ${
+              statusTab === 'listed'
+                ? 'bg-white border-[#C9BEA9]'
+                : 'bg-white/80 border-[#E6DFD3] hover:bg-white'
+            }`}
+          >
+            <div className="text-xs font-medium text-[#57534E]">
+              {pageContent.custom_fields.stat_listed_label || 'Listed Issues'}
+            </div>
+            <div className="text-2xl font-display font-bold text-[#1C1917] tabular-nums mt-0.5">
+              {loading ? '—' : counts.listed}
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStatusTab('all')}
+            className={`text-left rounded-xl px-4 py-3 border transition-colors ${
+              statusTab === 'all'
+                ? 'bg-white border-[#C9BEA9]'
+                : 'bg-white/80 border-[#E6DFD3] hover:bg-white'
+            }`}
+          >
+            <div className="text-xs font-medium text-[#57534E]">
+              {pageContent.custom_fields.stat_total_label || 'Total Tracked'}
+            </div>
+            <div className="text-2xl font-display font-bold text-[#1C1917] tabular-nums mt-0.5">
+              {loading ? '—' : counts.all}
+            </div>
           </button>
         </div>
       </section>
+
+      <PageNoticeBanner
+        title={pageContent.notice_banner_title}
+        body={pageContent.notice_banner_body}
+      />
 
       {/* Main Unified IPO Board */}
       <section className="space-y-4">
         {/* Clean Toolbar: Status Tabs + Category Toggle + Search */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Status Segmented Tabs */}
-          <div className="flex items-center gap-1 p-1 bg-[#F3F4F6] rounded-lg overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 bg-[#EFE9DD] border border-[#E6DFD3] rounded-lg overflow-x-auto">
             {statusTabs.map((tab) => {
               const active = statusTab === tab.id;
               return (
@@ -136,8 +218,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                   onClick={() => setStatusTab(tab.id)}
                   className={`px-3.5 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
                     active
-                      ? 'bg-white text-[#111827] shadow-2xs'
-                      : 'text-[#4B5563] hover:text-[#111827]'
+                      ? 'bg-[#14532D] text-white shadow-2xs'
+                      : 'text-[#57534E] hover:text-[#1C1917]'
                   }`}
                 >
                   {tab.label} ({tab.count})
@@ -148,7 +230,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           <div className="flex flex-wrap items-center gap-2.5">
             {/* Category Filter */}
-            <div className="flex items-center gap-1 p-1 bg-[#F3F4F6] rounded-lg">
+            <div className="flex items-center gap-1 p-1 bg-[#EFE9DD] border border-[#E6DFD3] rounded-lg">
               {(['all', 'Mainboard', 'SME'] as const).map((cat) => (
                 <button
                   key={cat}
@@ -156,8 +238,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                   onClick={() => setCategoryFilter(cat)}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
                     categoryFilter === cat
-                      ? 'bg-white text-[#111827] shadow-2xs'
-                      : 'text-[#4B5563] hover:text-[#111827]'
+                      ? 'bg-white text-[#1C1917] shadow-2xs'
+                      : 'text-[#57534E] hover:text-[#1C1917]'
                   }`}
                 >
                   {cat === 'all' ? 'All' : cat}
@@ -167,36 +249,43 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* Inline Search */}
             <div className="relative flex-1 sm:flex-initial">
-              <Search className="w-4 h-4 text-[#6B7280] absolute left-3 top-2.5 pointer-events-none" />
+              <Search className="w-4 h-4 text-[#78716C] absolute left-3 top-2.5 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Filter by company..."
+                placeholder={pageContent.custom_fields.search_placeholder || 'Filter by company...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-56 h-9.5 pl-9 pr-3 text-sm bg-white border border-[#E5E7EB] focus:border-[#111827] rounded-lg outline-none text-[#111827] placeholder:text-[#6B7280] transition-colors"
+                className="w-full sm:w-56 h-9.5 pl-9 pr-3 text-sm bg-white border border-[#DFD6C7] focus:border-[#14532D] rounded-lg outline-none text-[#1C1917] placeholder:text-[#78716C] transition-colors"
               />
             </div>
           </div>
         </div>
 
         {/* Clean Single-Elevation IPO Table */}
-        <div className="bg-white border border-[#EAEAEA] rounded-xl overflow-hidden">
+        <div className="bg-white border border-[#E6DFD3] rounded-xl overflow-hidden shadow-2xs">
           {loading ? (
-            <div className="divide-y divide-[#F3F4F6]">
+            <div className="divide-y divide-[#F2ECE1]">
               {[1, 2, 3, 4, 5].map((n) => (
                 <div key={n} className="px-5 py-4 flex items-center justify-between animate-pulse">
                   <div className="space-y-2">
-                    <div className="h-4 w-48 bg-[#F3F4F6] rounded" />
-                    <div className="h-3 w-32 bg-[#F3F4F6] rounded" />
+                    <div className="h-4 w-48 bg-[#F2ECE1] rounded" />
+                    <div className="h-3 w-32 bg-[#F2ECE1] rounded" />
                   </div>
-                  <div className="h-4 w-24 bg-[#F3F4F6] rounded" />
+                  <div className="h-4 w-24 bg-[#F2ECE1] rounded" />
                 </div>
               ))}
             </div>
+          ) : ipos.length === 0 ? (
+            <div className="py-16 px-6 text-center space-y-2">
+              <p className="text-base font-medium text-[#1C1917]">No IPOs published yet</p>
+              <p className="text-sm text-[#57534E] max-w-md mx-auto">
+                Mainboard and SME IPO listings, subscription numbers, and indicative unlisted prices will appear here once added from the Admin Console.
+              </p>
+            </div>
           ) : filteredIPOs.length === 0 ? (
             <div className="py-14 px-6 text-center space-y-3">
-              <p className="text-base font-medium text-[#111827]">No matching IPOs</p>
-              <p className="text-sm text-[#4B5563]">
+              <p className="text-base font-medium text-[#1C1917]">No matching IPOs</p>
+              <p className="text-sm text-[#57534E]">
                 Try switching the status tab or clearing your search filter.
               </p>
               <button
@@ -206,7 +295,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   setCategoryFilter('all');
                   setSearchQuery('');
                 }}
-                className="px-4 py-2 text-sm font-medium bg-[#111827] text-white rounded-lg hover:bg-[#1F2937] transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-[#14532D] text-white rounded-lg hover:bg-[#0F3F22] transition-colors"
               >
                 Show All IPOs
               </button>
@@ -214,23 +303,23 @@ export const HomePage: React.FC<HomePageProps> = ({
           ) : (
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left text-sm">
-                <thead className="bg-[#FAFAFA] border-b border-[#EAEAEA] text-[#4B5563] text-xs font-semibold">
+                <thead className="bg-[#FAF6EE] border-b border-[#E6DFD3] text-[#57534E] text-xs font-semibold">
                   <tr>
                     <th className="py-3.5 px-5">Company</th>
                     <th className="py-3.5 px-3">Dates</th>
                     <th className="py-3.5 px-3 text-right">Price Band</th>
                     <th className="py-3.5 px-3 text-right">Min Investment</th>
-                    <th className="py-3.5 px-3 text-right">GMP</th>
+                    <th className="py-3.5 px-3 text-right">Unlisted Price</th>
                     <th className="py-3.5 px-3 text-right">
                       {statusTab === 'listed' ? 'Listing Gain' : 'Subscription'}
                     </th>
                     <th className="py-3.5 px-5 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#F3F4F6]">
+                <tbody className="divide-y divide-[#F2ECE1]">
                   {filteredIPOs.map((ipo) => {
                     const daysRem = calculateDaysRemaining(ipo.close_date);
-                    const minApp = calculateMinApplication(ipo.price_band_max, ipo.lot_size);
+                    const minApp = getEffectiveMinInvestment(ipo);
                     const basePrice = ipo.issue_price || ipo.price_band_max;
                     const gmpPct =
                       ipo.latest_gmp && basePrice
@@ -248,43 +337,53 @@ export const HomePage: React.FC<HomePageProps> = ({
                       <tr
                         key={ipo.id}
                         onClick={() => navigate(`/ipo/${ipo.slug}`)}
-                        className="hover:bg-[#FAFAFA] transition-colors cursor-pointer group"
+                        className="hover:bg-[#FAF7F1] transition-colors cursor-pointer group"
                       >
                         <td className="py-4 px-5">
-                          <div className="font-semibold text-sm sm:text-[15px] text-[#111827] group-hover:underline underline-offset-2">
+                          <div className="font-semibold text-sm sm:text-[15px] text-[#1C1917] group-hover:text-[#14532D] transition-colors">
                             {ipo.company?.name || ipo.slug}
                           </div>
-                          <div className="text-xs text-[#4B5563] flex flex-wrap items-center gap-1.5 mt-0.5">
-                            <span>{ipo.category}</span>
+                          <div className="text-xs text-[#57534E] flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span
+                              className={
+                                ipo.category === 'SME'
+                                  ? 'text-[#9A5B13] font-medium'
+                                  : 'text-[#14532D] font-medium'
+                              }
+                            >
+                              {ipo.category}
+                            </span>
                             <span aria-hidden="true">·</span>
                             <span>{ipo.exchange}</span>
                             {ipo.issue_size && (
                               <>
                                 <span aria-hidden="true">·</span>
-                                <span className="tabular-nums">{formatCrores(ipo.issue_size)}</span>
+                                <span className="font-mono tabular-nums">{formatCrores(ipo.issue_size)}</span>
                               </>
                             )}
                           </div>
                         </td>
 
                         <td className="py-4 px-3 whitespace-nowrap">
-                          <div className="tabular-nums text-[#111827]">
+                          <div className="font-mono tabular-nums text-xs sm:text-sm text-[#1C1917]">
                             {ipo.open_date
                               ? `${formatIndianDate(ipo.open_date)} – ${formatIndianDate(ipo.close_date)}`
                               : 'Dates TBA'}
                           </div>
                           <div className="text-xs mt-0.5">
                             {ipo.status === 'ongoing' && daysRem.days !== null ? (
-                              <span className="text-[#16A34A] font-medium">{daysRem.statusText}</span>
+                              <span className="text-[#15803D] font-medium">{daysRem.statusText}</span>
                             ) : ipo.status === 'listed' && ipo.listing_date ? (
-                              <span className="text-[#4B5563]">Listed {formatIndianDate(ipo.listing_date)}</span>
+                              <span className="text-[#57534E]">Listed {formatIndianDate(ipo.listing_date)}</span>
+                            ) : ipo.status === 'upcoming' ? (
+                              <span className="text-[#B45309] font-medium">Upcoming</span>
                             ) : (
-                              <span className="text-[#4B5563] capitalize">{ipo.status}</span>
+                              <span className="text-[#57534E] capitalize">{ipo.status}</span>
                             )}
                           </div>
                         </td>
 
-                        <td className="py-4 px-3 text-right tabular-nums whitespace-nowrap text-[#111827] font-medium">
+                        <td className="py-4 px-3 text-right font-mono tabular-nums whitespace-nowrap text-[#1C1917] font-medium">
                           {ipo.price_band_min && ipo.price_band_max
                             ? `₹${ipo.price_band_min} – ₹${ipo.price_band_max}`
                             : ipo.price_band_max || ipo.issue_price
@@ -292,21 +391,21 @@ export const HomePage: React.FC<HomePageProps> = ({
                             : 'TBA'}
                         </td>
 
-                        <td className="py-4 px-3 text-right tabular-nums whitespace-nowrap">
-                          <div className="font-medium text-[#111827]">
+                        <td className="py-4 px-3 text-right font-mono tabular-nums whitespace-nowrap">
+                          <div className="font-medium text-[#1C1917]">
                             {minApp ? `₹${minApp.toLocaleString('en-IN')}` : '—'}
                           </div>
                           {ipo.lot_size && (
-                            <div className="text-xs text-[#4B5563]">{ipo.lot_size} shares</div>
+                            <div className="text-xs font-sans text-[#78716C]">{ipo.lot_size} shares</div>
                           )}
                         </td>
 
-                        <td className="py-4 px-3 text-right tabular-nums whitespace-nowrap">
+                        <td className="py-4 px-3 text-right font-mono tabular-nums whitespace-nowrap">
                           {ipo.latest_gmp ? (
                             <div>
                               <span
                                 className={`font-medium ${
-                                  ipo.latest_gmp.gmp_amount >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                                  ipo.latest_gmp.gmp_amount >= 0 ? 'text-[#15803D]' : 'text-[#B91C1C]'
                                 }`}
                               >
                                 {ipo.latest_gmp.gmp_amount >= 0 ? '+' : ''}₹{ipo.latest_gmp.gmp_amount}
@@ -314,7 +413,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                               {gmpPct !== null && (
                                 <div
                                   className={`text-xs ${
-                                    gmpPct >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                                    gmpPct >= 0 ? 'text-[#15803D]' : 'text-[#B91C1C]'
                                   }`}
                                 >
                                   {gmpPct >= 0 ? '+' : ''}{gmpPct}%
@@ -322,32 +421,32 @@ export const HomePage: React.FC<HomePageProps> = ({
                               )}
                             </div>
                           ) : (
-                            <span className="text-[#6B7280]">—</span>
+                            <span className="text-[#78716C]">—</span>
                           )}
                         </td>
 
-                        <td className="py-4 px-3 text-right tabular-nums whitespace-nowrap">
+                        <td className="py-4 px-3 text-right font-mono tabular-nums whitespace-nowrap">
                           {ipo.status === 'listed' && listingGainPct !== null ? (
                             <span
                               className={`font-semibold ${
-                                listingGainPct >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                                listingGainPct >= 0 ? 'text-[#15803D]' : 'text-[#B91C1C]'
                               }`}
                             >
                               {listingGainPct >= 0 ? '+' : ''}{listingGainPct}%
                             </span>
                           ) : ipo.latest_subscription ? (
                             <div>
-                              <span className="font-semibold text-[#111827]">
+                              <span className="font-semibold text-[#1C1917]">
                                 {ipo.latest_subscription.total_multiple.toFixed(2)}x
                               </span>
                               {ipo.latest_subscription.day_number && (
-                                <div className="text-xs text-[#4B5563]">
+                                <div className="text-xs font-sans text-[#78716C]">
                                   Day {ipo.latest_subscription.day_number}
                                 </div>
                               )}
                             </div>
                           ) : (
-                            <span className="text-[#6B7280]">Awaiting</span>
+                            <span className="font-sans text-[#78716C]">Awaiting</span>
                           )}
                         </td>
 
@@ -359,7 +458,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                 e.stopPropagation();
                                 onOpenAllotment?.(ipo.slug);
                               }}
-                              className="px-3.5 py-1.5 text-sm font-medium bg-white hover:bg-[#F3F4F6] text-[#111827] border border-[#E5E7EB] rounded-lg transition-colors"
+                              className="px-3.5 py-1.5 text-sm font-medium bg-[#FAF7F1] hover:bg-[#EFE9DD] text-[#1C1917] border border-[#DFD6C7] rounded-lg transition-colors"
                             >
                               Allotment
                             </button>
@@ -370,7 +469,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                 e.stopPropagation();
                                 navigate(`/ipo/${ipo.slug}`);
                               }}
-                              className="px-3.5 py-1.5 text-sm font-medium bg-[#111827] hover:bg-[#1F2937] text-white rounded-lg transition-colors"
+                              className="px-3.5 py-1.5 text-sm font-medium bg-[#14532D] hover:bg-[#0F3F22] text-white rounded-lg transition-colors"
                             >
                               View
                             </button>
@@ -386,71 +485,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* Focused Utility Strip */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white border border-[#EAEAEA] rounded-xl p-6 flex flex-col justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-[#4B5563]">
-              <CheckCircle2 className="w-4 h-4 text-[#111827]" />
-              <span>Multi-PAN Allotment Vault</span>
-            </div>
-            <h2 className="text-lg font-semibold text-[#111827]">
-              Check multiple family PANs in one click
-            </h2>
-            <p className="text-sm text-[#4B5563] leading-relaxed">
-              Save PAN numbers locally in your browser so you never have to re-type them across KFinTech, Link Intime, or Bigshare on allotment day.
-              {savedPanCount > 0 && (
-                <span className="text-[#111827] font-medium ml-1">
-                  ({savedPanCount} PAN{savedPanCount > 1 ? 's' : ''} currently saved)
-                </span>
-              )}
-            </p>
-          </div>
-          <div>
-            <button
-              type="button"
-              onClick={() => onOpenAllotment?.(undefined)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-[#111827] hover:bg-[#1F2937] text-white rounded-lg transition-colors"
-            >
-              <span>Open Allotment Checker</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white border border-[#EAEAEA] rounded-xl p-6 flex flex-col justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-medium text-[#4B5563]">
-              <Calculator className="w-4 h-4 text-[#111827]" />
-              <span>GMP &amp; Return Tools</span>
-            </div>
-            <h2 className="text-lg font-semibold text-[#111827]">
-              Track grey market premiums &amp; listing returns
-            </h2>
-            <p className="text-sm text-[#4B5563] leading-relaxed">
-              Monitor live GMP trends, estimate expected listing gains per lot, or check upcoming bidding windows on the IPO calendar.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => navigate('/ipo/gmp')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-white hover:bg-[#F9FAFB] text-[#111827] border border-[#E5E7EB] rounded-lg transition-colors"
-            >
-              <span>GMP &amp; Profit Estimator</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/calendar')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-white hover:bg-[#F9FAFB] text-[#111827] border border-[#E5E7EB] rounded-lg transition-colors"
-            >
-              <span>IPO Calendar</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </section>
+      <PageExtraSections sections={pageContent.extra_sections} />
     </div>
   );
 };

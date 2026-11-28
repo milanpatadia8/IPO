@@ -23,14 +23,25 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Bootstrapped owner email ALWAYS requires email_verified == true to prevent spoofing
     function isBootstrapAdmin() {
-      return isVerified() && request.auth.token.email == 'milanpatadia8@gmail.com';
+      return isVerified() &&
+        request.auth.token.email is string &&
+        request.auth.token.email.lower() == 'milanpatadia8@gmail.com';
     }
 
+    function isAuthorizedAdminByEmail() {
+      return isVerified() &&
+        request.auth.token.email is string &&
+        exists(/databases/$(database)/documents/authorized_admins/$(request.auth.token.email.lower().replace('[^a-z0-9]', '_')));
+    }
+
+    // Admin is either verified bootstrap owner, explicitly registered in /admins/{uid}, or pre-authorized in /authorized_admins/{emailKey}
     function isAdmin() {
       return isVerified() && (
-        request.auth.token.email == 'milanpatadia8@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        isBootstrapAdmin() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        isAuthorizedAdminByEmail()
       );
     }
 
@@ -50,31 +61,21 @@ service cloud.firestore {
       return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
     }
 
-    function isOptionalNumber(data, field) {
-      return !(field in data) || (data[field] is int || data[field] is float);
-    }
-
-    function isOptionalMap(data, field) {
-      return !(field in data) || data[field] is map;
-    }
-
-    function isOptionalBoundedList(data, field, maxLen) {
-      return !(field in data) || (
-        data[field] is list &&
-        data[field].size() <= maxLen &&
-        (data[field].size() == 0 || data[field][0] is map)
-      );
+    function isOptionalBool(data, field) {
+      return !(field in data) || data[field] is bool;
     }
 
     // ---------------------------------------------------------
-    // Validation Blueprints
+    // Validation Blueprints (Optimized to stay well below 1,000 exprs)
     // ---------------------------------------------------------
     function isValidUserProfile(data) {
-      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
-        data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
+      let keys = data.keys().toSet();
+      return keys.hasAll(['uid', 'email', 'displayName', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
+        keys.hasOnly(['uid', 'email', 'displayName', 'phone', 'photoURL', 'role', 'isActive', 'createdAt', 'updatedAt']) &&
         isValidId(data.uid) &&
         data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
         data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        isOptionalString(data, 'phone', 20) &&
         isOptionalString(data, 'photoURL', 500) &&
         data.role in ['user', 'admin'] &&
         data.isActive is bool &&
@@ -83,100 +84,189 @@ service cloud.firestore {
     }
 
     function isValidAdminRecord(data) {
-      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt']) &&
-        data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt']) &&
+      let keys = data.keys().toSet();
+      return keys.hasAll(['uid', 'email', 'grantedBy', 'createdAt']) &&
+        keys.hasOnly(['uid', 'email', 'grantedBy', 'createdAt']) &&
         isValidId(data.uid) &&
         data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
         isValidId(data.grantedBy) &&
         data.createdAt is timestamp;
     }
 
-    function isValidCompanyMap(comp) {
-      return comp is map &&
-        comp.keys().hasAll(['id', 'name', 'slug', 'created_at', 'updated_at']) &&
-        comp.keys().hasOnly(['id', 'name', 'slug', 'description', 'industry', 'website_url', 'logo_url', 'created_at', 'updated_at']) &&
-        isValidId(comp.id) &&
-        comp.name is string && comp.name.size() >= 1 && comp.name.size() <= 200 &&
+    function isValidAuthorizedAdmin(data) {
+      let keys = data.keys().toSet();
+      return keys.hasAll(['id', 'email', 'added_by', 'added_at', 'createdAt']) &&
+        keys.hasOnly(['id', 'email', 'added_by', 'added_at', 'createdAt']) &&
+        isValidId(data.id) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.added_by is string && data.added_by.size() >= 1 && data.added_by.size() <= 254 &&
+        data.added_at is string && data.added_at.size() >= 1 && data.added_at.size() <= 64 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidCompanyMap(comp, expectedCompanyId) {
+      let ckeys = comp.keys().toSet();
+      return ckeys.hasAll(['id', 'name', 'slug', 'created_at', 'updated_at']) &&
+        ckeys.hasOnly(['id', 'name', 'slug', 'description', 'industry', 'website_url', 'logo_url', 'created_at', 'updated_at']) &&
+        comp.id == expectedCompanyId &&
+        comp.name is string && comp.name.size() >= 1 && comp.name.size() <= 300 &&
         comp.slug is string && comp.slug.size() >= 1 && comp.slug.size() <= 160 &&
-        isOptionalString(comp, 'description', 2000) &&
-        isOptionalString(comp, 'industry', 120) &&
-        isOptionalString(comp, 'website_url', 500) &&
-        isOptionalString(comp, 'logo_url', 500) &&
+        (!('description' in comp) || (comp.description is string && comp.description.size() <= 20000)) &&
+        (!('industry' in comp) || (comp.industry is string && comp.industry.size() <= 200)) &&
+        (!('website_url' in comp) || (comp.website_url is string && comp.website_url.size() <= 2500)) &&
+        (!('logo_url' in comp) || (comp.logo_url is string && comp.logo_url.size() <= 2500)) &&
         comp.created_at is string && comp.created_at.size() <= 64 &&
         comp.updated_at is string && comp.updated_at.size() <= 64;
     }
 
     function isValidIPO(data) {
-      return data.keys().hasAll([
+      let keys = data.keys().toSet();
+      return keys.hasAll([
           'id', 'company_id', 'company', 'slug', 'category', 'exchange',
           'status', 'announcement_status', 'visibility', 'created_at',
           'updated_at', 'updatedBy', 'createdAt', 'updatedAt'
         ]) &&
-        data.keys().hasOnly([
+        keys.hasOnly([
           'id', 'company_id', 'company', 'slug', 'category', 'exchange',
           'status', 'announcement_status', 'visibility',
           'open_date', 'close_date', 'allotment_date', 'refund_date', 'demat_credit_date', 'listing_date',
           'price_band_min', 'price_band_max', 'issue_price', 'lot_size',
           'issue_size', 'fresh_issue_size', 'offer_for_sale_size',
           'retail_quota_percent', 'qib_quota_percent', 'nii_quota_percent',
+          'employee_quota_percent', 'shareholder_quota_percent', 'other_quota_percent',
+          'category_lot_limits', 'min_investment_multiples',
           'registrar_name', 'registrar_url', 'drhp_url', 'rhp_url', 'official_source_url',
           'data_verified_at', 'published_at', 'created_at', 'updated_at',
           'latest_gmp', 'previous_gmp', 'gmp_history',
           'latest_subscription', 'subscription_history', 'listing_result', 'important_dates',
           'updatedBy', 'createdAt', 'updatedAt'
         ]) &&
-        isValidId(data.id) &&
-        isValidId(data.company_id) &&
-        isValidCompanyMap(data.company) &&
-        data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 160 && data.slug.matches('^[a-z0-9\\-]+$') &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.company_id is string && data.company_id.size() >= 1 && data.company_id.size() <= 128 &&
+        data.company is map &&
+        isValidCompanyMap(data.company, data.company_id) &&
+        data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 160 &&
         data.category in ['Mainboard', 'SME'] &&
         data.exchange in ['NSE', 'BSE', 'NSE, BSE', 'BSE SME', 'NSE Emerge'] &&
         data.status in ['upcoming', 'ongoing', 'closed', 'listed', 'postponed', 'withdrawn'] &&
         data.announcement_status in ['confirmed', 'dates_announced', 'expected', 'awaiting_details', 'postponed', 'withdrawn'] &&
-        data.visibility in ['members'] &&
-        isOptionalString(data, 'open_date', 32) &&
-        isOptionalString(data, 'close_date', 32) &&
-        isOptionalString(data, 'allotment_date', 32) &&
-        isOptionalString(data, 'refund_date', 32) &&
-        isOptionalString(data, 'demat_credit_date', 32) &&
-        isOptionalString(data, 'listing_date', 32) &&
-        isOptionalNumber(data, 'price_band_min') &&
-        isOptionalNumber(data, 'price_band_max') &&
-        isOptionalNumber(data, 'issue_price') &&
-        isOptionalNumber(data, 'lot_size') &&
-        isOptionalNumber(data, 'issue_size') &&
-        isOptionalNumber(data, 'fresh_issue_size') &&
-        isOptionalNumber(data, 'offer_for_sale_size') &&
-        isOptionalNumber(data, 'retail_quota_percent') &&
-        isOptionalNumber(data, 'qib_quota_percent') &&
-        isOptionalNumber(data, 'nii_quota_percent') &&
-        isOptionalString(data, 'registrar_name', 200) &&
-        isOptionalString(data, 'registrar_url', 500) &&
-        isOptionalString(data, 'drhp_url', 500) &&
-        isOptionalString(data, 'rhp_url', 500) &&
-        isOptionalString(data, 'official_source_url', 500) &&
-        isOptionalString(data, 'data_verified_at', 64) &&
-        isOptionalString(data, 'published_at', 64) &&
+        data.visibility == 'members' &&
         data.created_at is string && data.created_at.size() <= 64 &&
         data.updated_at is string && data.updated_at.size() <= 64 &&
-        isOptionalMap(data, 'latest_gmp') &&
-        isOptionalMap(data, 'previous_gmp') &&
-        isOptionalBoundedList(data, 'gmp_history', 100) &&
-        isOptionalMap(data, 'latest_subscription') &&
-        isOptionalBoundedList(data, 'subscription_history', 50) &&
-        isOptionalMap(data, 'listing_result') &&
-        isOptionalBoundedList(data, 'important_dates', 20) &&
-        isValidId(data.updatedBy) &&
+        (!('min_investment_multiples' in data) || data.min_investment_multiples is map) &&
+        (!('gmp_history' in data) || (data.gmp_history is list && data.gmp_history.size() <= 200)) &&
+        (!('subscription_history' in data) || (data.subscription_history is list && data.subscription_history.size() <= 100)) &&
+        (!('important_dates' in data) || (data.important_dates is list && data.important_dates.size() <= 30)) &&
+        data.updatedBy == request.auth.uid &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidClientRecord(data) {
+      let keys = data.keys().toSet();
+      return keys.hasAll([
+          'id', 'full_name', 'status', 'total_fee_agreed', 'total_fee_paid',
+          'balance_due', 'fee_status', 'payments', 'joined_date',
+          'created_at', 'updated_at', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        keys.hasOnly([
+          'id', 'full_name', 'email', 'phone', 'pan', 'demat_id', 'client_code',
+          'service_plan', 'status', 'total_fee_agreed', 'total_fee_paid',
+          'balance_due', 'fee_status', 'fee_waived', 'fee_due_date', 'payments',
+          'notes', 'joined_date', 'created_at', 'updated_at',
+          'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.full_name is string && data.full_name.size() >= 1 && data.full_name.size() <= 200 &&
+        data.status in ['active', 'inactive', 'lead', 'suspended'] &&
+        data.total_fee_agreed is number && data.total_fee_agreed >= 0 &&
+        data.total_fee_paid is number && data.total_fee_paid >= 0 &&
+        data.balance_due is number && data.balance_due >= 0 &&
+        data.fee_status in ['paid', 'partial', 'pending', 'waived'] &&
+        data.payments is list && data.payments.size() <= 250 &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 5000)) &&
+        data.joined_date is string && data.joined_date.size() <= 32 &&
+        data.created_at is string && data.created_at.size() <= 64 &&
+        data.updated_at is string && data.updated_at.size() <= 64 &&
+        data.updatedBy == request.auth.uid &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSitePolicy(data) {
+      let keys = data.keys().toSet();
+      return keys.hasAll([
+          'id', 'slug', 'title', 'category',
+          'show_in_footer_links', 'show_in_footer_banner',
+          'sort_order', 'sections', 'visibility',
+          'created_at', 'updated_at', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        keys.hasOnly([
+          'id', 'slug', 'title', 'subtitle', 'category', 'footer_summary',
+          'show_in_footer_links', 'show_in_footer_banner',
+          'sort_order', 'sections', 'visibility',
+          'created_at', 'updated_at', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 100 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 300 &&
+        (!('subtitle' in data) || (data.subtitle is string && data.subtitle.size() <= 500)) &&
+        data.category in ['disclaimer', 'terms', 'privacy', 'policy', 'disclosure'] &&
+        (!('footer_summary' in data) || (data.footer_summary is string && data.footer_summary.size() <= 6000)) &&
+        data.show_in_footer_links is bool &&
+        data.show_in_footer_banner is bool &&
+        data.sort_order is number && data.sort_order >= 0 && data.sort_order <= 1000 &&
+        data.sections is list && data.sections.size() <= 50 &&
+        data.visibility == 'public' &&
+        data.created_at is string && data.created_at.size() <= 64 &&
+        data.updated_at is string && data.updated_at.size() <= 64 &&
+        data.updatedBy == request.auth.uid &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSitePage(data) {
+      let keys = data.keys().toSet();
+      return keys.hasAll([
+          'id', 'page_key', 'page_label', 'route_path', 'title',
+          'custom_fields', 'extra_sections', 'visibility',
+          'created_at', 'updated_at', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        keys.hasOnly([
+          'id', 'page_key', 'page_label', 'route_path',
+          'eyebrow', 'title', 'subtitle',
+          'primary_cta_label', 'secondary_cta_label',
+          'notice_banner_title', 'notice_banner_body',
+          'custom_fields', 'extra_sections', 'visibility',
+          'created_at', 'updated_at', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 64 &&
+        data.page_key in ['site_chrome', 'home', 'ongoing', 'upcoming', 'unlisted_price', 'listed', 'calendar', 'ipo_detail'] &&
+        data.id == data.page_key &&
+        data.page_label is string && data.page_label.size() >= 1 && data.page_label.size() <= 200 &&
+        data.route_path is string && data.route_path.size() >= 1 && data.route_path.size() <= 120 &&
+        (!('eyebrow' in data) || (data.eyebrow is string && data.eyebrow.size() <= 250)) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 300 &&
+        (!('subtitle' in data) || (data.subtitle is string && data.subtitle.size() <= 2000)) &&
+        (!('primary_cta_label' in data) || (data.primary_cta_label is string && data.primary_cta_label.size() <= 120)) &&
+        (!('secondary_cta_label' in data) || (data.secondary_cta_label is string && data.secondary_cta_label.size() <= 120)) &&
+        (!('notice_banner_title' in data) || (data.notice_banner_title is string && data.notice_banner_title.size() <= 300)) &&
+        (!('notice_banner_body' in data) || (data.notice_banner_body is string && data.notice_banner_body.size() <= 5000)) &&
+        data.custom_fields is map && data.custom_fields.size() <= 40 &&
+        data.extra_sections is list && data.extra_sections.size() <= 30 &&
+        data.visibility == 'public' &&
+        data.created_at is string && data.created_at.size() <= 64 &&
+        data.updated_at is string && data.updated_at.size() <= 64 &&
         data.updatedBy == request.auth.uid &&
         data.createdAt is timestamp &&
         data.updatedAt is timestamp;
     }
 
     function isValidAuditLog(data) {
-      return data.keys().hasAll(['id', 'actor_id', 'actor_name', 'action', 'entity_type', 'entity_id', 'created_at', 'createdAt']) &&
-        data.keys().hasOnly(['id', 'actor_id', 'actor_name', 'action', 'entity_type', 'entity_id', 'before_summary', 'after_summary', 'created_at', 'createdAt']) &&
-        isValidId(data.id) &&
-        isValidId(data.actor_id) &&
+      let keys = data.keys().toSet();
+      return keys.hasAll(['id', 'actor_id', 'actor_name', 'action', 'entity_type', 'entity_id', 'created_at', 'createdAt']) &&
+        keys.hasOnly(['id', 'actor_id', 'actor_name', 'action', 'entity_type', 'entity_id', 'before_summary', 'after_summary', 'created_at', 'createdAt']) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
         data.actor_id == request.auth.uid &&
         data.actor_name is string && data.actor_name.size() >= 1 && data.actor_name.size() <= 120 &&
         data.action is string && data.action.size() >= 1 && data.action.size() <= 80 &&
@@ -189,67 +279,70 @@ service cloud.firestore {
     }
 
     function isValidFeedRun(data) {
-      return data.keys().hasAll([
+      let keys = data.keys().toSet();
+      return keys.hasAll([
           'id', 'provider_name', 'job_type', 'started_at', 'status',
           'records_fetched', 'records_accepted', 'records_rejected', 'created_at', 'createdAt'
         ]) &&
-        data.keys().hasOnly([
+        keys.hasOnly([
           'id', 'source_id', 'provider_name', 'job_type', 'started_at', 'finished_at',
           'status', 'records_fetched', 'records_accepted', 'records_rejected', 'created_at', 'createdAt'
         ]) &&
-        isValidId(data.id) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
         isOptionalString(data, 'source_id', 128) &&
         data.provider_name is string && data.provider_name.size() >= 1 && data.provider_name.size() <= 150 &&
         data.job_type in ['ipo_discovery', 'subscription_sync', 'gmp_sync', 'listing_sync', 'csv_import'] &&
         data.started_at is string && data.started_at.size() <= 64 &&
         isOptionalString(data, 'finished_at', 64) &&
         data.status in ['running', 'success', 'partial', 'failed'] &&
-        (data.records_fetched is int || data.records_fetched is float) &&
-        (data.records_accepted is int || data.records_accepted is float) &&
-        (data.records_rejected is int || data.records_rejected is float) &&
+        data.records_fetched is number &&
+        data.records_accepted is number &&
+        data.records_rejected is number &&
         data.created_at is string && data.created_at.size() <= 64 &&
         data.createdAt is timestamp;
     }
 
     function isValidAppSettings(data) {
-      return data.keys().hasAll(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'updatedBy', 'updatedAt']) &&
-        data.keys().hasOnly(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'updatedBy', 'updatedAt']) &&
-        (data.gmpStalenessHours is int || data.gmpStalenessHours is float) &&
+      let keys = data.keys().toSet();
+      return keys.hasAll(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'updatedBy', 'updatedAt']) &&
+        keys.hasOnly(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'policiesCustomized', 'updatedBy', 'updatedAt']) &&
+        data.gmpStalenessHours is number &&
         data.gmpStalenessHours >= 1 && data.gmpStalenessHours <= 168 &&
-        (data.subStalenessHours is int || data.subStalenessHours is float) &&
+        data.subStalenessHours is number &&
         data.subStalenessHours >= 1 && data.subStalenessHours <= 168 &&
         data.seeded is bool &&
-        isValidId(data.updatedBy) &&
+        isOptionalBool(data, 'policiesCustomized') &&
         data.updatedBy == request.auth.uid &&
         data.updatedAt is timestamp;
     }
 
     function isValidIPOApplication(data) {
-      return data.keys().hasAll([
+      let keys = data.keys().toSet();
+      return keys.hasAll([
           'id', 'userId', 'userEmail', 'userName', 'ipoId', 'ipoSlug',
           'companyName', 'category', 'investorCategory', 'lots', 'shares',
           'bidPrice', 'totalAmount', 'upiId', 'pan', 'status',
           'created_at', 'createdAt', 'updatedAt'
         ]) &&
-        data.keys().hasOnly([
+        keys.hasOnly([
           'id', 'userId', 'userEmail', 'userName', 'ipoId', 'ipoSlug',
           'companyName', 'category', 'investorCategory', 'lots', 'shares',
           'bidPrice', 'totalAmount', 'upiId', 'pan', 'status',
           'created_at', 'createdAt', 'updatedAt'
         ]) &&
-        isValidId(data.id) &&
-        isValidId(data.userId) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
         data.userEmail is string && data.userEmail.size() >= 3 && data.userEmail.size() <= 254 &&
         data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 120 &&
-        isValidId(data.ipoId) &&
-        data.ipoSlug is string && data.ipoSlug.size() >= 1 && data.ipoSlug.size() <= 160 && data.ipoSlug.matches('^[a-z0-9\\-]+$') &&
-        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 200 &&
+        data.ipoId is string && data.ipoId.size() >= 1 && data.ipoId.size() <= 128 &&
+        data.ipoSlug is string && data.ipoSlug.size() >= 1 && data.ipoSlug.size() <= 160 &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 300 &&
         data.category in ['Mainboard', 'SME'] &&
-        data.investorCategory in ['Retail', 'sHNI', 'bHNI'] &&
-        (data.lots is int || data.lots is float) && data.lots >= 1 && data.lots <= 100 &&
-        (data.shares is int || data.shares is float) && data.shares >= 1 && data.shares <= 10000000 &&
-        (data.bidPrice is int || data.bidPrice is float) && data.bidPrice > 0 && data.bidPrice <= 1000000 &&
-        (data.totalAmount is int || data.totalAmount is float) && data.totalAmount > 0 && data.totalAmount <= 1000000000 &&
+        data.investorCategory in ['Retail', 'Employee', 'Shareholder', 'sHNI', 'bHNI', 'QIB'] &&
+        data.lots is number && data.lots >= 1 && data.lots <= 10000 &&
+        data.shares is number && data.shares >= 1 && data.shares <= 100000000 &&
+        data.bidPrice is number && data.bidPrice > 0 && data.bidPrice <= 1000000 &&
+        data.totalAmount is number && data.totalAmount > 0 && data.totalAmount <= 10000000000 &&
         data.upiId is string && data.upiId.size() >= 3 && data.upiId.size() <= 120 && data.upiId.matches('^[^\\s@]+@[^\\s@]+$') &&
         data.pan is string && data.pan.size() == 10 && data.pan.matches('^[A-Z]{5}[0-9]{4}[A-Z]{1}$') &&
         data.status in ['submitted', 'cancelled'] &&
@@ -263,31 +356,37 @@ service cloud.firestore {
     // ---------------------------------------------------------
     match /users/{userId} {
       allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
-      allow list: if isVerified() && (existing().uid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().uid == request.auth.uid || isAdmin());
 
-      allow create: if isVerified() &&
+      allow create: if isSignedIn() &&
         isValidId(userId) &&
         isValidUserProfile(incoming()) &&
         incoming().uid == userId &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         (
-          (isOwner(userId) && incoming().email == request.auth.token.email && (incoming().role == 'user' || isBootstrapAdmin())) ||
+          (
+            isOwner(userId) &&
+            isVerified() &&
+            request.auth.token.email is string &&
+            incoming().email.lower() == request.auth.token.email.lower() &&
+            (incoming().role == 'user' || isBootstrapAdmin() || isAuthorizedAdminByEmail())
+          ) ||
           isAdmin()
         );
 
-      allow update: if isVerified() &&
+      allow update: if isSignedIn() &&
         isValidId(userId) &&
         isValidUserProfile(incoming()) &&
         incoming().uid == existing().uid &&
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time &&
         (
-          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'role', 'isActive', 'updatedAt'])) ||
-          (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']))
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'photoURL', 'role', 'isActive', 'updatedAt'])) ||
+          (isOwner(userId) && isVerified() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'photoURL', 'updatedAt']))
         );
 
-      allow delete: if isVerified() && isValidId(userId) && isAdmin();
+      allow delete: if isAdmin() && isValidId(userId);
     }
 
     // ---------------------------------------------------------
@@ -295,9 +394,9 @@ service cloud.firestore {
     // ---------------------------------------------------------
     match /admins/{userId} {
       allow get: if isSignedIn() && isValidId(userId) && (isOwner(userId) || isAdmin());
-      allow list: if isVerified() && isAdmin();
+      allow list: if isAdmin();
 
-      allow create: if isVerified() &&
+      allow create: if isSignedIn() &&
         isValidId(userId) &&
         isValidAdminRecord(incoming()) &&
         incoming().uid == userId &&
@@ -305,7 +404,7 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         isAdmin();
 
-      allow update: if isVerified() &&
+      allow update: if isSignedIn() &&
         isValidId(userId) &&
         isValidAdminRecord(incoming()) &&
         incoming().uid == existing().uid &&
@@ -313,7 +412,26 @@ service cloud.firestore {
         isAdmin() &&
         incoming().diff(existing()).affectedKeys().hasOnly(['email', 'grantedBy']);
 
-      allow delete: if isVerified() && isValidId(userId) && isAdmin();
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /authorized_admins/{emailKey} (Admin-Only)
+    // ---------------------------------------------------------
+    match /authorized_admins/{emailKey} {
+      allow get: if isAdmin() && isValidId(emailKey);
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+        isValidId(emailKey) &&
+        isValidAuthorizedAdmin(incoming()) &&
+        incoming().id == emailKey &&
+        incoming().createdAt == request.time &&
+        isAdmin();
+
+      allow update: if false;
+
+      allow delete: if isAdmin() && isValidId(emailKey);
     }
 
     // ---------------------------------------------------------
@@ -323,7 +441,7 @@ service cloud.firestore {
       allow get: if isValidId(ipoId) && (existing().visibility == 'members' || isAdmin());
       allow list: if existing().visibility == 'members' || isAdmin();
 
-      allow create: if isVerified() &&
+      allow create: if isSignedIn() &&
         isValidId(ipoId) &&
         isValidIPO(incoming()) &&
         incoming().id == ipoId &&
@@ -331,37 +449,109 @@ service cloud.firestore {
         incoming().updatedAt == request.time &&
         isAdmin();
 
-      allow update: if isVerified() &&
+      allow update: if isSignedIn() &&
         isValidId(ipoId) &&
         isValidIPO(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().company_id == existing().company_id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        !incoming().diff(existing()).affectedKeys().hasAny(['id', 'company_id', 'created_at', 'createdAt']);
+
+      allow delete: if isAdmin() && isValidId(ipoId);
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /clients/{clientId} (Admin-Only PII & Fees Ledger)
+    // ---------------------------------------------------------
+    match /clients/{clientId} {
+      allow get: if isAdmin() && isValidId(clientId);
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() &&
+        isValidId(clientId) &&
+        isValidClientRecord(incoming()) &&
+        incoming().id == clientId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+
+      allow update: if isSignedIn() &&
+        isValidId(clientId) &&
+        isValidClientRecord(incoming()) &&
         incoming().id == existing().id &&
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time &&
         isAdmin() &&
-        incoming().diff(existing()).affectedKeys().hasOnly([
-          'company', 'slug', 'category', 'exchange', 'status', 'announcement_status', 'visibility',
-          'open_date', 'close_date', 'allotment_date', 'refund_date', 'demat_credit_date', 'listing_date',
-          'price_band_min', 'price_band_max', 'issue_price', 'lot_size',
-          'issue_size', 'fresh_issue_size', 'offer_for_sale_size',
-          'retail_quota_percent', 'qib_quota_percent', 'nii_quota_percent',
-          'registrar_name', 'registrar_url', 'drhp_url', 'rhp_url', 'official_source_url',
-          'data_verified_at', 'published_at', 'updated_at',
-          'latest_gmp', 'previous_gmp', 'gmp_history',
-          'latest_subscription', 'subscription_history', 'listing_result', 'important_dates',
-          'updatedBy', 'updatedAt'
-        ]);
+        !incoming().diff(existing()).affectedKeys().hasAny(['id', 'created_at', 'createdAt']);
 
-      allow delete: if isVerified() && isValidId(ipoId) && isAdmin();
+      allow delete: if isAdmin() && isValidId(clientId);
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /site_policies/{policyId} (Public Read, Admin Manage)
+    // ---------------------------------------------------------
+    match /site_policies/{policyId} {
+      allow get: if isValidId(policyId) && (existing().visibility == 'public' || isAdmin());
+      allow list: if existing().visibility == 'public' || isAdmin();
+
+      allow create: if isSignedIn() &&
+        isValidId(policyId) &&
+        isValidSitePolicy(incoming()) &&
+        incoming().id == policyId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+
+      allow update: if isSignedIn() &&
+        isValidId(policyId) &&
+        isValidSitePolicy(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        !incoming().diff(existing()).affectedKeys().hasAny(['id', 'created_at', 'createdAt']);
+
+      allow delete: if isAdmin() && isValidId(policyId);
+    }
+
+    // ---------------------------------------------------------
+    // Collection: /site_pages/{pageId} (Public Read, Admin Manage)
+    // ---------------------------------------------------------
+    match /site_pages/{pageId} {
+      allow get: if isValidId(pageId) && (existing().visibility == 'public' || isAdmin());
+      allow list: if existing().visibility == 'public' || isAdmin();
+
+      allow create: if isSignedIn() &&
+        isValidId(pageId) &&
+        isValidSitePage(incoming()) &&
+        incoming().id == pageId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+
+      allow update: if isSignedIn() &&
+        isValidId(pageId) &&
+        isValidSitePage(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().page_key == existing().page_key &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        !incoming().diff(existing()).affectedKeys().hasAny(['id', 'page_key', 'created_at', 'createdAt']);
+
+      allow delete: if isAdmin() && isValidId(pageId);
     }
 
     // ---------------------------------------------------------
     // Collection: /audit_logs/{logId} (Immutable Append-Only)
     // ---------------------------------------------------------
     match /audit_logs/{logId} {
-      allow get: if isVerified() && isValidId(logId) && isAdmin();
-      allow list: if isVerified() && isAdmin();
+      allow get: if isAdmin() && isValidId(logId);
+      allow list: if isAdmin();
 
-      allow create: if isVerified() &&
+      allow create: if isSignedIn() &&
         isValidId(logId) &&
         isValidAuditLog(incoming()) &&
         incoming().id == logId &&
@@ -375,10 +565,10 @@ service cloud.firestore {
     // Collection: /feed_runs/{runId}
     // ---------------------------------------------------------
     match /feed_runs/{runId} {
-      allow get: if isVerified() && isValidId(runId) && isAdmin();
-      allow list: if isVerified() && isAdmin();
+      allow get: if isAdmin() && isValidId(runId);
+      allow list: if isAdmin();
 
-      allow create: if isVerified() &&
+      allow create: if isSignedIn() &&
         isValidId(runId) &&
         isValidFeedRun(incoming()) &&
         incoming().id == runId &&
@@ -395,18 +585,18 @@ service cloud.firestore {
       allow get: if isValidId(settingId) && (settingId == 'global' || isAdmin());
       allow list: if false;
 
-      allow create: if isVerified() &&
+      allow create: if isSignedIn() &&
         isValidId(settingId) &&
         isValidAppSettings(incoming()) &&
         incoming().updatedAt == request.time &&
         isAdmin();
 
-      allow update: if isVerified() &&
+      allow update: if isSignedIn() &&
         isValidId(settingId) &&
         isValidAppSettings(incoming()) &&
         incoming().updatedAt == request.time &&
         isAdmin() &&
-        incoming().diff(existing()).affectedKeys().hasOnly(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'updatedBy', 'updatedAt']);
+        incoming().diff(existing()).affectedKeys().hasOnly(['gmpStalenessHours', 'subStalenessHours', 'seeded', 'policiesCustomized', 'updatedBy', 'updatedAt']);
 
       allow delete: if false;
     }
@@ -415,20 +605,23 @@ service cloud.firestore {
     // Collection: /ipo_applications/{applicationId} (End-User Private)
     // ---------------------------------------------------------
     match /ipo_applications/{applicationId} {
-      allow get: if isVerified() && isValidId(applicationId) && (existing().userId == request.auth.uid || isAdmin());
-      allow list: if isVerified() && (existing().userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(applicationId) && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
 
-      allow create: if isVerified() &&
+      allow create: if isSignedIn() &&
+        isVerified() &&
         isValidId(applicationId) &&
         isValidIPOApplication(incoming()) &&
         incoming().id == applicationId &&
         incoming().userId == request.auth.uid &&
-        incoming().userEmail == request.auth.token.email &&
+        request.auth.token.email is string &&
+        incoming().userEmail.lower() == request.auth.token.email.lower() &&
         incoming().status == 'submitted' &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time;
 
-      allow update: if isVerified() &&
+      allow update: if isSignedIn() &&
+        isVerified() &&
         isValidId(applicationId) &&
         isValidIPOApplication(incoming()) &&
         incoming().id == existing().id &&
@@ -441,7 +634,7 @@ service cloud.firestore {
           isAdmin()
         );
 
-      allow delete: if isVerified() && isValidId(applicationId) && isAdmin();
+      allow delete: if isAdmin() && isValidId(applicationId);
     }
   }
 }

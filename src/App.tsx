@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { LoginModal } from './components/LoginModal';
+import { ProfileModal } from './components/ProfileModal';
 import { AllotmentCheckerModal } from './components/AllotmentCheckerModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { HomePage } from './pages/HomePage';
@@ -11,33 +12,42 @@ import { ListedIPOsPage } from './pages/ListedIPOsPage';
 import { GMPTrackerPage } from './pages/GMPTrackerPage';
 import { IPODetailPage } from './pages/IPODetailPage';
 import { CalendarPage } from './pages/CalendarPage';
-import { AboutPage } from './pages/AboutPage';
-import { DisclaimerPage } from './pages/DisclaimerPage';
-import { TermsPage } from './pages/TermsPage';
-import { PrivacyPage } from './pages/PrivacyPage';
+import { PolicyDocumentPage } from './pages/PolicyDocumentPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
 import { AdminIPOsPage } from './pages/admin/AdminIPOsPage';
+import { AdminClientsPage } from './pages/admin/AdminClientsPage';
 import { AdminGMPPage } from './pages/admin/AdminGMPPage';
 import { AdminSubscriptionsPage } from './pages/admin/AdminSubscriptionsPage';
-import { AdminFeedsPage } from './pages/admin/AdminFeedsPage';
+import { AdminPoliciesPage } from './pages/admin/AdminPoliciesPage';
 import { AdminImportsPage } from './pages/admin/AdminImportsPage';
 import { AdminAuditPage } from './pages/admin/AdminAuditPage';
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
-import { IPO } from './types/ipo';
+import { IPO, SitePolicy, SitePageContent, SitePageKey } from './types/ipo';
 import { api } from './lib/api';
-import { useAuth, AppUserProfile } from './lib/auth';
+import { DEFAULT_SITE_POLICIES } from './lib/defaultPolicies';
+import { cloneDefaultSitePages } from './lib/defaultPageContent';
+import { SiteContentProvider } from './lib/siteContent';
+import { PageNoticeBanner } from './components/PageCustomSections';
+import { useAuth, AppUserProfile, formatUserContact } from './lib/auth';
 import { ShieldAlert, LogOut, ArrowLeft, LogIn } from 'lucide-react';
 
 export function App() {
-  const { profile, adminUser, isSignedIn, isAdmin, authReady, signOut } = useAuth();
+  const {
+    profile,
+    adminUser,
+    isSignedIn,
+    isAdmin,
+    authReady,
+    signOut,
+  } = useAuth();
 
   const [currentRoute, setCurrentRoute] = useState<string>(() => {
     return window.location.pathname || '/';
   });
   const [adminTab, setAdminTab] = useState<string>('overview');
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
-  const [loginIntent, setLoginIntent] = useState<'user' | 'admin'>('user');
+  const [profileModalOpen, setProfileModalOpen] = useState<boolean>(false);
   const [loginReason, setLoginReason] = useState<string | undefined>(undefined);
   const pendingAfterLoginRef = useRef<(() => void) | null>(null);
 
@@ -45,26 +55,45 @@ export function App() {
   const [allotmentSlug, setAllotmentSlug] = useState<string | undefined>(undefined);
   const [commandOpen, setCommandOpen] = useState<boolean>(false);
   const [allIpos, setAllIpos] = useState<IPO[]>([]);
-  const [seedVersion, setSeedVersion] = useState<number>(0);
+  const [sitePolicies, setSitePolicies] = useState<SitePolicy[]>(DEFAULT_SITE_POLICIES);
+  const [policiesLoaded, setPoliciesLoaded] = useState<boolean>(false);
+  const [sitePages, setSitePages] = useState<Record<SitePageKey, SitePageContent>>(() =>
+    cloneDefaultSitePages()
+  );
 
-  // Seed Firestore automatically when an admin signs in for the first time
-  useEffect(() => {
-    if (!authReady) return;
-    if (isAdmin && adminUser) {
-      api
-        .ensureSeededInFirestore(adminUser.id)
-        .then(() => setSeedVersion((v) => v + 1))
-        .catch((err) => console.error('Initial Firestore seed failed:', err));
-    }
-  }, [authReady, isAdmin, adminUser]);
+  const refreshPolicies = useCallback(() => {
+    api
+      .getSitePolicies()
+      .then((list) => {
+        setSitePolicies(list);
+        setPoliciesLoaded(true);
+      })
+      .catch((err) => {
+        console.error('Failed to load site policies:', err);
+        setPoliciesLoaded(true);
+      });
+  }, []);
 
-  // Load IPO catalog publicly without requiring login
+  const refreshSitePages = useCallback(() => {
+    api
+      .getSitePages()
+      .then((pages) => {
+        setSitePages(pages);
+      })
+      .catch((err) => {
+        console.error('Failed to load site page content:', err);
+      });
+  }, []);
+
+  // Load IPO catalog, site policies & editable page content publicly without requiring login
   useEffect(() => {
     api
       .getAllIPOs()
       .then(setAllIpos)
       .catch((err) => console.error('Failed to load IPOs:', err));
-  }, [currentRoute, seedVersion]);
+    refreshPolicies();
+    refreshSitePages();
+  }, [currentRoute, isSignedIn, refreshPolicies, refreshSitePages]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -91,12 +120,7 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const openLoginModal = (
-    intent: 'user' | 'admin' = 'user',
-    reason?: string,
-    onAfterLogin?: () => void
-  ) => {
-    setLoginIntent(intent);
+  const openLoginModal = (reason?: string, onAfterLogin?: () => void) => {
     setLoginReason(reason);
     pendingAfterLoginRef.current = onAfterLogin || null;
     setLoginModalOpen(true);
@@ -113,18 +137,10 @@ export function App() {
     setAllotmentOpen(true);
   };
 
-  const handleLoginSuccess = (
-    loggedInProfile: AppUserProfile,
-    chosenRole: 'user' | 'admin'
-  ) => {
+  const handleLoginSuccess = (_loggedInProfile: AppUserProfile) => {
     const pending = pendingAfterLoginRef.current;
     pendingAfterLoginRef.current = null;
     setLoginReason(undefined);
-
-    if (chosenRole === 'admin' && loggedInProfile.role === 'admin') {
-      navigate('/admin');
-      return;
-    }
 
     if (pending) {
       pending();
@@ -139,25 +155,31 @@ export function App() {
   };
 
   const renderRoute = () => {
-    // Public disclosure / informational routes
-    if (currentRoute === '/about') {
-      return <AboutPage navigate={navigate} />;
-    }
-    if (currentRoute === '/disclaimer') {
-      return <DisclaimerPage navigate={navigate} />;
-    }
-    if (currentRoute === '/terms') {
-      return <TermsPage />;
-    }
-    if (currentRoute === '/privacy') {
-      return <PrivacyPage />;
+    if (
+      currentRoute === '/about' ||
+      currentRoute === '/disclaimer' ||
+      currentRoute === '/terms' ||
+      currentRoute === '/privacy' ||
+      currentRoute.startsWith('/policy/')
+    ) {
+      const targetSlug = currentRoute.startsWith('/policy/')
+        ? decodeURIComponent(currentRoute.replace('/policy/', '').replace(/\/+$/, ''))
+        : currentRoute.slice(1);
+      const matchedPolicy = sitePolicies.find((p) => p.slug === targetSlug);
+      return (
+        <PolicyDocumentPage
+          policy={matchedPolicy}
+          loading={!policiesLoaded}
+          navigate={navigate}
+        />
+      );
     }
 
-    // Protected Admin Console Route (Login required for Admin to edit backend details)
+    // Protected Admin Console (Strictly milanpatadia8@gmail.com + Admins authorized by owner)
     if (currentRoute === '/admin' || currentRoute.startsWith('/admin/')) {
       if (!authReady) {
         return (
-          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#EAEAEA] rounded-xl text-center text-sm text-[#4B5563]">
+          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#E6DFD3] rounded-xl text-center text-sm text-[#57534E]">
             Checking login session...
           </div>
         );
@@ -165,15 +187,15 @@ export function App() {
 
       if (!isSignedIn) {
         return (
-          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#EAEAEA] rounded-xl text-center space-y-4">
-            <h2 className="text-lg font-semibold text-[#111827]">Admin Console</h2>
-            <p className="text-sm text-[#4B5563]">
-              Login with an authorized administrator account to edit IPO details, GMP quotes, subscriptions, and backend settings.
+          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#E6DFD3] rounded-xl text-center space-y-4">
+            <h2 className="text-lg font-display font-semibold text-[#1C1917]">Admin Console</h2>
+            <p className="text-sm text-[#57534E]">
+              Login with an authorized administrator account to edit IPO details from the backend.
             </p>
             <button
               type="button"
-              onClick={() => openLoginModal('admin', 'Login with an authorized Admin account to edit backend details.')}
-              className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-[#111827] text-white text-sm font-medium rounded-lg hover:bg-[#1F2937] transition-colors"
+              onClick={() => openLoginModal('Login with an authorized Admin account to open the Admin Console.')}
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-[#14532D] text-white text-sm font-medium rounded-lg hover:bg-[#0F3F22] transition-colors"
             >
               <LogIn className="w-4 h-4" />
               <span>Login</span>
@@ -184,30 +206,34 @@ export function App() {
 
       if (!isAdmin || !adminUser) {
         return (
-          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#EAEAEA] rounded-xl text-center space-y-4">
-            <div className="w-10 h-10 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center mx-auto">
+          <div className="max-w-md mx-auto my-20 p-8 bg-white border border-[#E6DFD3] rounded-xl text-center space-y-4">
+            <div className="w-10 h-10 rounded-lg bg-[#FDF6E9] border border-[#ECD7B3] text-[#B45309] flex items-center justify-center mx-auto">
               <ShieldAlert className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-semibold text-[#111827]">Admin Access Required</h2>
-            <p className="text-sm text-[#4B5563] leading-relaxed">
-              You are logged in as <strong className="text-[#111827]">{profile?.email}</strong> with End User access. Only authorized administrators can edit backend IPO details.
+            <h2 className="text-lg font-display font-semibold text-[#1C1917]">Admin Authorization Required</h2>
+            <p className="text-sm text-[#57534E] leading-relaxed">
+              You are logged in as{' '}
+              <strong className="text-[#1C1917]">
+                {formatUserContact(profile?.email, profile?.phone)}
+              </strong>
+              . You do not have Admin access yet—only accounts authorized by the primary Admin can edit backend IPO details.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => navigate('/')}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#111827] text-white text-sm font-medium rounded-lg hover:bg-[#1F2937] transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#14532D] text-white text-sm font-medium rounded-lg hover:bg-[#0F3F22] transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>View IPOs</span>
+                <span>Back to IPOs</span>
               </button>
               <button
                 type="button"
-                onClick={() => openLoginModal('admin', 'Select an authorized Admin Google account to continue.')}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-[#E5E7EB] text-[#4B5563] hover:text-[#111827] text-sm font-medium rounded-lg transition-colors"
+                onClick={handleSignOut}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-[#DFD6C7] text-[#57534E] hover:text-[#1C1917] text-sm font-medium rounded-lg transition-colors"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Switch Account</span>
+                <span>Logout</span>
               </button>
             </div>
           </div>
@@ -219,6 +245,7 @@ export function App() {
           currentAdminTab={adminTab}
           setAdminTab={setAdminTab}
           adminUser={adminUser}
+          onOpenProfile={() => setProfileModalOpen(true)}
           onLogout={handleSignOut}
           navigate={navigate}
         >
@@ -226,9 +253,16 @@ export function App() {
             <AdminOverviewPage adminUser={adminUser} setAdminTab={setAdminTab} />
           )}
           {adminTab === 'ipos' && <AdminIPOsPage adminUser={adminUser} />}
+          {adminTab === 'clients' && <AdminClientsPage adminUser={adminUser} />}
           {adminTab === 'gmp' && <AdminGMPPage adminUser={adminUser} />}
           {adminTab === 'subscriptions' && <AdminSubscriptionsPage adminUser={adminUser} />}
-          {adminTab === 'feeds' && <AdminFeedsPage adminUser={adminUser} />}
+          {adminTab === 'policies' && (
+            <AdminPoliciesPage
+              adminUser={adminUser}
+              onPoliciesChanged={refreshPolicies}
+              onPagesChanged={refreshSitePages}
+            />
+          )}
           {adminTab === 'imports' && <AdminImportsPage adminUser={adminUser} />}
           {adminTab === 'audit' && <AdminAuditPage adminUser={adminUser} />}
           {adminTab === 'settings' && <AdminSettingsPage adminUser={adminUser} />}
@@ -242,6 +276,7 @@ export function App() {
       currentRoute !== '/ipo/upcoming' &&
       currentRoute !== '/ipo/ongoing' &&
       currentRoute !== '/ipo/listed' &&
+      currentRoute !== '/ipo/unlisted-price' &&
       currentRoute !== '/ipo/gmp'
     ) {
       const slug = currentRoute.replace('/ipo/', '');
@@ -249,9 +284,7 @@ export function App() {
         <IPODetailPage
           slug={slug}
           navigate={navigate}
-          onRequireLogin={(reason, onAfterLogin) =>
-            openLoginModal('user', reason, onAfterLogin)
-          }
+          onRequireLogin={(reason, onAfterLogin) => openLoginModal(reason, onAfterLogin)}
         />
       );
     }
@@ -263,9 +296,7 @@ export function App() {
         <OngoingIPOsPage
           navigate={navigate}
           searchParam={searchParam}
-          onRequireLogin={(reason, onAfterLogin) =>
-            openLoginModal('user', reason, onAfterLogin)
-          }
+          onRequireLogin={(reason, onAfterLogin) => openLoginModal(reason, onAfterLogin)}
         />
       );
     }
@@ -278,7 +309,7 @@ export function App() {
       return <ListedIPOsPage navigate={navigate} />;
     }
 
-    if (currentRoute === '/ipo/gmp') {
+    if (currentRoute === '/ipo/unlisted-price' || currentRoute === '/ipo/gmp') {
       return <GMPTrackerPage navigate={navigate} />;
     }
 
@@ -296,55 +327,77 @@ export function App() {
   };
 
   const isAdminRoute = currentRoute === '/admin' || currentRoute.startsWith('/admin/');
+  const siteChrome = sitePages.site_chrome;
+  const hasGlobalNotice = Boolean(
+    (siteChrome?.notice_banner_title || '').trim() || (siteChrome?.notice_banner_body || '').trim()
+  );
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-[#111827] font-sans">
-      {!(isAdminRoute && isAdmin) && (
-        <Header
-          currentRoute={currentRoute}
-          navigate={navigate}
-          userProfile={profile}
-          isAdmin={isAdmin}
-          onOpenLogin={() => openLoginModal('user')}
-          onSignOut={handleSignOut}
-          onOpenAllotment={() => openAllotment(undefined)}
+    <SiteContentProvider pages={sitePages}>
+      <div className="min-h-screen flex flex-col bg-[#F7F4EE] text-[#1C1917] font-sans">
+        {!(isAdminRoute && isAdmin) && (
+          <Header
+            currentRoute={currentRoute}
+            navigate={navigate}
+            userProfile={profile}
+            isAdmin={isAdmin}
+            onOpenLogin={() => openLoginModal()}
+            onOpenProfile={() => setProfileModalOpen(true)}
+            onSignOut={handleSignOut}
+            onOpenAllotment={() => openAllotment(undefined)}
+          />
+        )}
+
+        {!(isAdminRoute && isAdmin) && hasGlobalNotice && (
+          <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <PageNoticeBanner
+              title={siteChrome.notice_banner_title}
+              body={siteChrome.notice_banner_body}
+              compact
+            />
+          </div>
+        )}
+
+        <main className="flex-1">{renderRoute()}</main>
+
+        {!(isAdminRoute && isAdmin) && (
+          <Footer
+            navigate={navigate}
+            userProfile={profile}
+            isAdmin={isAdmin}
+            onOpenLogin={() => openLoginModal()}
+            policies={sitePolicies}
+          />
+        )}
+
+        <LoginModal
+          isOpen={loginModalOpen}
+          onClose={handleCloseLoginModal}
+          onSuccess={handleLoginSuccess}
+          reason={loginReason}
         />
-      )}
 
-      <main className="flex-1">{renderRoute()}</main>
-
-      {!(isAdminRoute && isAdmin) && (
-        <Footer
-          navigate={navigate}
-          userProfile={profile}
-          isAdmin={isAdmin}
-          onOpenAdminLogin={() => openLoginModal('admin')}
+        <ProfileModal
+          isOpen={profileModalOpen}
+          onClose={() => setProfileModalOpen(false)}
         />
-      )}
 
-      <LoginModal
-        isOpen={loginModalOpen}
-        onClose={handleCloseLoginModal}
-        onSuccess={handleLoginSuccess}
-        intent={loginIntent}
-        reason={loginReason}
-      />
+        <AllotmentCheckerModal
+          isOpen={allotmentOpen}
+          onClose={() => setAllotmentOpen(false)}
+          ipos={allIpos}
+          preselectedSlug={allotmentSlug}
+        />
 
-      <AllotmentCheckerModal
-        isOpen={allotmentOpen}
-        onClose={() => setAllotmentOpen(false)}
-        ipos={allIpos}
-        preselectedSlug={allotmentSlug}
-      />
-
-      <CommandPaletteModal
-        isOpen={commandOpen}
-        onClose={() => setCommandOpen(false)}
-        ipos={allIpos}
-        navigate={navigate}
-        onOpenAllotment={openAllotment}
-      />
-    </div>
+        <CommandPaletteModal
+          isOpen={commandOpen}
+          onClose={() => setCommandOpen(false)}
+          ipos={allIpos}
+          navigate={navigate}
+          onOpenAllotment={openAllotment}
+        />
+      </div>
+    </SiteContentProvider>
   );
 }
 

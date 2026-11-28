@@ -103,7 +103,9 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         <div className="max-h-80 overflow-y-auto divide-y divide-[#F3F4F6]">
           {results.length === 0 ? (
             <div className="py-10 px-4 text-center text-sm text-[#4B5563]">
-              No matching IPOs found for &ldquo;{query}&rdquo;.
+              {query.trim()
+                ? `No matching IPOs found for "${query}".`
+                : 'No IPOs published yet.'}
             </div>
           ) : (
             results.map((ipo, idx) => {

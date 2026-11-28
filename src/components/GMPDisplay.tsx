@@ -23,7 +23,7 @@ export const GMPDisplay: React.FC<GMPDisplayProps> = ({
   compact = false,
 }) => {
   if (!latestGmp) {
-    return <span className="text-[#4B5563] text-sm">—</span>;
+    return <span className="text-[#78716C] text-sm">—</span>;
   }
 
   const gmpAmount = latestGmp.gmp_amount;
@@ -41,16 +41,16 @@ export const GMPDisplay: React.FC<GMPDisplayProps> = ({
   if (compact) {
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <div className="flex items-center gap-1.5 tabular-nums text-sm">
-          <span className="font-semibold text-[#111827]">₹{gmpAmount}</span>
+        <div className="flex items-center gap-1.5 font-mono tabular-nums text-sm">
+          <span className="font-semibold text-[#1C1917]">₹{gmpAmount}</span>
           {indicativeGainPct !== null && (
             <span
               className={`font-medium ${
                 indicativeGainPct > 0
-                  ? 'text-[#16A34A]'
+                  ? 'text-[#15803D]'
                   : indicativeGainPct < 0
-                  ? 'text-[#DC2626]'
-                  : 'text-[#4B5563]'
+                  ? 'text-[#B91C1C]'
+                  : 'text-[#57534E]'
               }`}
             >
               ({indicativeGainPct > 0 ? '+' : ''}
@@ -58,7 +58,7 @@ export const GMPDisplay: React.FC<GMPDisplayProps> = ({
             </span>
           )}
         </div>
-        {isStale && <span className="text-xs text-[#D97706]">Stale quote</span>}
+        {isStale && <span className="text-xs text-[#B45309]">Stale quote</span>}
       </div>
     );
   }
@@ -66,19 +66,19 @@ export const GMPDisplay: React.FC<GMPDisplayProps> = ({
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold tabular-nums text-[#111827]">
+        <span className="text-2xl font-mono font-semibold tabular-nums text-[#1C1917]">
           ₹{gmpAmount}
         </span>
-        <span className="text-sm text-[#4B5563]">per share</span>
+        <span className="text-sm text-[#57534E]">per share</span>
 
         {indicativeGainPct !== null && (
           <span
-            className={`text-sm font-semibold tabular-nums ${
+            className={`text-sm font-mono font-semibold tabular-nums ${
               indicativeGainPct > 0
-                ? 'text-[#16A34A]'
+                ? 'text-[#15803D]'
                 : indicativeGainPct < 0
-                ? 'text-[#DC2626]'
-                : 'text-[#4B5563]'
+                ? 'text-[#B91C1C]'
+                : 'text-[#57534E]'
             }`}
           >
             {indicativeGainPct > 0 ? '+' : ''}
@@ -88,39 +88,39 @@ export const GMPDisplay: React.FC<GMPDisplayProps> = ({
       </div>
 
       {estListingPrice && (
-        <div className="text-sm text-[#4B5563] tabular-nums">
-          <span>Est. Listing: </span>
-          <span className="font-semibold text-[#111827]">₹{estListingPrice}</span>
+        <div className="text-sm text-[#57534E] tabular-nums">
+          <span>Indicative Unlisted Price: </span>
+          <span className="font-mono font-semibold text-[#1C1917]">₹{estListingPrice}</span>
         </div>
       )}
 
       {(latestGmp.kostak_rate || latestGmp.subject_to_sauda_rate || demandInfo) && (
-        <div className="flex flex-wrap items-center gap-3 pt-1 text-sm text-[#4B5563]">
+        <div className="flex flex-wrap items-center gap-3 pt-1 text-sm text-[#57534E]">
           {latestGmp.kostak_rate && (
             <span className="tabular-nums">
-              <span>Kostak: </span>
-              <strong className="font-medium text-[#111827]">₹{latestGmp.kostak_rate}</strong>
+              <span>App Quote: </span>
+              <strong className="font-mono font-medium text-[#1C1917]">₹{latestGmp.kostak_rate}</strong>
             </span>
           )}
           {latestGmp.subject_to_sauda_rate && (
             <span className="tabular-nums">
-              <span>Sauda: </span>
-              <strong className="font-medium text-[#111827]">₹{latestGmp.subject_to_sauda_rate}</strong>
+              <span>Allotment Quote: </span>
+              <strong className="font-mono font-medium text-[#1C1917]">₹{latestGmp.subject_to_sauda_rate}</strong>
             </span>
           )}
           {demandInfo && (
             <span>
-              Demand: <strong className="font-medium text-[#111827]">{demandInfo.label}</strong>
+              Demand: <strong className="font-medium text-[#1C1917]">{demandInfo.label}</strong>
             </span>
           )}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-[#4B5563] pt-0.5">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[#78716C] pt-0.5">
         {changeAmount !== null && changeAmount !== 0 && (
           <span
-            className={`tabular-nums flex items-center gap-0.5 ${
-              changeAmount > 0 ? 'text-[#16A34A] font-medium' : 'text-[#DC2626] font-medium'
+            className={`font-mono tabular-nums flex items-center gap-0.5 ${
+              changeAmount > 0 ? 'text-[#15803D] font-medium' : 'text-[#B91C1C] font-medium'
             }`}
           >
             {changeAmount > 0 ? (
@@ -138,7 +138,7 @@ export const GMPDisplay: React.FC<GMPDisplayProps> = ({
         {isStale ? (
           <>
             <span aria-hidden="true">·</span>
-            <span className="text-[#D97706] flex items-center gap-1 font-medium">
+            <span className="text-[#B45309] flex items-center gap-1 font-medium">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>Older than 24h</span>
             </span>

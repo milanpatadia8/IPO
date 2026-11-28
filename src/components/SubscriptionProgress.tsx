@@ -13,7 +13,7 @@ export const SubscriptionProgress: React.FC<SubscriptionProgressProps> = ({
   compact = false,
 }) => {
   if (!subscription) {
-    return <span className="text-[#4B5563] text-sm">Awaiting Bids</span>;
+    return <span className="text-[#78716C] text-sm">Awaiting Bids</span>;
   }
 
   const { retail_multiple, nii_multiple, qib_multiple, total_multiple, observed_at, day_number } =
@@ -24,10 +24,10 @@ export const SubscriptionProgress: React.FC<SubscriptionProgressProps> = ({
   if (compact) {
     return (
       <div className="flex flex-col items-start gap-0.5">
-        <span className="tabular-nums text-sm font-semibold text-[#111827]">
+        <span className="font-mono tabular-nums text-sm font-semibold text-[#1C1917]">
           {total_multiple.toFixed(2)}x
         </span>
-        <span className="text-xs text-[#4B5563] tabular-nums">
+        <span className="text-xs text-[#57534E] font-mono tabular-nums">
           R {retail_multiple}x · Q {qib_multiple}x · N {nii_multiple}x
         </span>
       </div>
@@ -38,13 +38,13 @@ export const SubscriptionProgress: React.FC<SubscriptionProgressProps> = ({
     <div className="space-y-3">
       <div className="flex items-baseline justify-between">
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-semibold tabular-nums text-[#111827]">
+          <span className="text-2xl font-mono font-semibold tabular-nums text-[#1C1917]">
             {total_multiple.toFixed(2)}x
           </span>
-          <span className="text-sm font-normal text-[#4B5563]">Total Subscribed</span>
+          <span className="text-sm font-normal text-[#57534E]">Total Subscribed</span>
         </div>
         {day_number && (
-          <span className="text-sm font-medium text-[#111827] tabular-nums">
+          <span className="text-sm font-medium text-[#14532D] font-mono tabular-nums">
             Day {day_number}
           </span>
         )}
@@ -55,14 +55,14 @@ export const SubscriptionProgress: React.FC<SubscriptionProgressProps> = ({
         {/* QIB */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs">
-            <span className="text-[#4B5563]">QIB (50%)</span>
-            <span className="tabular-nums font-semibold text-[#111827]">
+            <span className="text-[#57534E]">QIB (50%)</span>
+            <span className="font-mono tabular-nums font-semibold text-[#1C1917]">
               {qib_multiple.toFixed(2)}x
             </span>
           </div>
-          <div className="w-full bg-[#EAEAEA] rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-[#E6DFD3] rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-[#111827] h-1.5 rounded-full transition-all duration-300"
+              className="bg-[#14532D] h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${Math.min(100, (qib_multiple / 20) * 100)}%` }}
             />
           </div>
@@ -71,14 +71,14 @@ export const SubscriptionProgress: React.FC<SubscriptionProgressProps> = ({
         {/* NII */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs">
-            <span className="text-[#4B5563]">NII / HNI (15%)</span>
-            <span className="tabular-nums font-semibold text-[#111827]">
+            <span className="text-[#57534E]">NII / HNI (15%)</span>
+            <span className="font-mono tabular-nums font-semibold text-[#1C1917]">
               {nii_multiple.toFixed(2)}x
             </span>
           </div>
-          <div className="w-full bg-[#EAEAEA] rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-[#E6DFD3] rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-[#4B5563] h-1.5 rounded-full transition-all duration-300"
+              className="bg-[#B45309] h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${Math.min(100, (nii_multiple / 20) * 100)}%` }}
             />
           </div>
@@ -87,14 +87,14 @@ export const SubscriptionProgress: React.FC<SubscriptionProgressProps> = ({
         {/* Retail */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs">
-            <span className="text-[#4B5563]">Retail (35%)</span>
-            <span className="tabular-nums font-semibold text-[#111827]">
+            <span className="text-[#57534E]">Retail (35%)</span>
+            <span className="font-mono tabular-nums font-semibold text-[#1C1917]">
               {retail_multiple.toFixed(2)}x
             </span>
           </div>
-          <div className="w-full bg-[#EAEAEA] rounded-full h-1.5 overflow-hidden">
+          <div className="w-full bg-[#E6DFD3] rounded-full h-1.5 overflow-hidden">
             <div
-              className="bg-[#16A34A] h-1.5 rounded-full transition-all duration-300"
+              className="bg-[#15803D] h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${Math.min(100, (retail_multiple / 20) * 100)}%` }}
             />
           </div>
@@ -102,12 +102,12 @@ export const SubscriptionProgress: React.FC<SubscriptionProgressProps> = ({
       </div>
 
       {/* Observation freshness */}
-      <div className="flex items-center gap-2 text-xs text-[#4B5563] pt-0.5">
+      <div className="flex items-center gap-2 text-xs text-[#78716C] pt-0.5">
         <span>Observed {formatIndianTimestamp(observed_at)}</span>
         {isStale && (
           <>
             <span aria-hidden="true">·</span>
-            <span className="text-amber-700 flex items-center gap-1 font-medium">
+            <span className="text-[#B45309] flex items-center gap-1 font-medium">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>Data may be delayed</span>
             </span>

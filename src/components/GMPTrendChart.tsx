@@ -20,7 +20,7 @@ export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice
   if (!history || history.length === 0) {
     return (
       <div className="h-56 flex items-center justify-center border border-dashed border-[#E5E7EB] rounded-xl text-[#4B5563] text-sm">
-        No historical GMP snapshots recorded yet
+        No historical unlisted price snapshots recorded yet
       </div>
     );
   }
@@ -77,7 +77,7 @@ export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice
                     <div className="bg-[#111827] text-white p-3 rounded-lg shadow-lg text-sm space-y-1.5">
                       <div className="font-medium text-neutral-200">{item.date}</div>
                       <div className="flex items-center justify-between gap-4 tabular-nums">
-                        <span className="text-neutral-300">GMP Quote:</span>
+                        <span className="text-neutral-300">Unlisted Spread:</span>
                         <span className="font-semibold text-white">₹{item.gmp}</span>
                       </div>
                       {basePrice && (
@@ -107,7 +107,7 @@ export const GMPTrendChart: React.FC<GMPTrendChartProps> = ({ history, basePrice
         </ResponsiveContainer>
       </div>
       <div className="flex items-center justify-between text-xs text-[#4B5563] pt-2 px-1">
-        <span>Timeline of accepted dealer observations</span>
+        <span>Timeline of recorded unlisted price observations</span>
         <span>All amounts in INR</span>
       </div>
     </div>

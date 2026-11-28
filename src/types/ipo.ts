@@ -7,6 +7,31 @@ export type IPOCategory = 'Mainboard' | 'SME';
 
 export type IPOExchange = 'NSE' | 'BSE' | 'NSE, BSE' | 'BSE SME' | 'NSE Emerge';
 
+export type InvestorLotCategory =
+  | 'Retail'
+  | 'Employee'
+  | 'Shareholder'
+  | 'sHNI'
+  | 'bHNI'
+  | 'QIB';
+
+export interface CategoryLotLimit {
+  min_lots?: number;
+  max_lots?: number;
+}
+
+export type CategoryLotLimitsMap = Partial<Record<InvestorLotCategory, CategoryLotLimit>>;
+
+export interface MinInvestmentMultiples {
+  min_lots?: number;
+  multiple_lots?: number;
+  min_shares?: number;
+  multiple_shares?: number;
+  min_amount?: number;
+  multiple_amount?: number;
+  max_multiples?: number;
+}
+
 export type IPOStatus =
   | 'upcoming'
   | 'ongoing'
@@ -159,6 +184,11 @@ export interface IPO {
   retail_quota_percent?: number;
   qib_quota_percent?: number;
   nii_quota_percent?: number;
+  employee_quota_percent?: number;
+  shareholder_quota_percent?: number;
+  other_quota_percent?: number;
+  category_lot_limits?: CategoryLotLimitsMap;
+  min_investment_multiples?: MinInvestmentMultiples;
   registrar_name?: string;
   registrar_url?: string;
   drhp_url?: string;
@@ -242,4 +272,111 @@ export interface MarketSummary {
     indicative_gain_pct?: number;
     observed_at: string;
   }>;
+}
+
+export type ClientStatus = 'active' | 'inactive' | 'lead' | 'suspended';
+
+export type FeePaymentStatus = 'paid' | 'partial' | 'pending' | 'waived';
+
+export type PaymentMode =
+  | 'UPI'
+  | 'NEFT/IMPS'
+  | 'Bank Transfer'
+  | 'Card'
+  | 'Cash'
+  | 'Cheque'
+  | 'Other';
+
+export interface ClientFeePayment {
+  id: string;
+  amount: number;
+  payment_date: string; // YYYY-MM-DD
+  payment_mode: PaymentMode;
+  reference_no?: string;
+  description?: string;
+  recorded_by: string;
+  created_at: string;
+}
+
+export interface ClientRecord {
+  id: string;
+  full_name: string;
+  email?: string;
+  phone?: string;
+  pan?: string;
+  demat_id?: string;
+  client_code?: string;
+  service_plan?: string;
+  status: ClientStatus;
+  total_fee_agreed: number;
+  total_fee_paid: number;
+  balance_due: number;
+  fee_status: FeePaymentStatus;
+  fee_waived?: boolean;
+  fee_due_date?: string; // YYYY-MM-DD
+  payments: ClientFeePayment[];
+  notes?: string;
+  joined_date: string; // YYYY-MM-DD
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthorizedAdminEntry {
+  email: string;
+  is_primary: boolean;
+  added_by?: string;
+  added_at: string;
+  has_account: boolean;
+  user_name?: string;
+}
+
+export type SitePolicyCategory = 'disclaimer' | 'terms' | 'privacy' | 'policy' | 'disclosure';
+
+export interface SitePolicySection {
+  heading: string;
+  body: string;
+}
+
+export interface SitePolicy {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle?: string;
+  category: SitePolicyCategory;
+  footer_summary?: string;
+  show_in_footer_links: boolean;
+  show_in_footer_banner: boolean;
+  sort_order: number;
+  sections: SitePolicySection[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type SitePageKey =
+  | 'site_chrome'
+  | 'home'
+  | 'ongoing'
+  | 'upcoming'
+  | 'unlisted_price'
+  | 'listed'
+  | 'calendar'
+  | 'ipo_detail';
+
+export interface SitePageContent {
+  id: SitePageKey;
+  page_key: SitePageKey;
+  page_label: string;
+  route_path: string;
+  eyebrow?: string;
+  title: string;
+  subtitle?: string;
+  primary_cta_label?: string;
+  secondary_cta_label?: string;
+  notice_banner_title?: string;
+  notice_banner_body?: string;
+  custom_fields: Record<string, string>;
+  extra_sections: SitePolicySection[];
+  is_customized?: boolean;
+  created_at: string;
+  updated_at: string;
 }

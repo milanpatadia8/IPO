@@ -35,20 +35,23 @@ export const DisclaimerPage: React.FC<DisclaimerPageProps> = ({ navigate }) => {
         </p>
       </div>
 
-      {/* 2. Grey Market Premium (GMP) Speculation Warning */}
+      {/* 2. SEBI No-GMP Policy & Unlisted Price Risk Notice */}
       <div className="bg-white border border-[#EAEAEA] rounded-xl p-6 space-y-3 text-sm text-[#4B5563] leading-relaxed">
         <h2 className="text-base font-semibold text-[#111827] flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-600" />
-          <span>2. Grey Market Premium (GMP) Speculative Risk</span>
+          <span>2. SEBI Compliance: No GMP Policy &amp; Unlisted Price Notice</span>
         </h2>
         <p>
-          <strong className="text-[#111827]">Grey Market Premium (GMP)</strong> represents unofficial, unregulated, and speculative bids circulated in informal dealer circles before an initial public offering lists on the stock exchange.
+          <strong className="text-[#111827]">As per SEBI&apos;s regulatory rules and guidelines, IPO Insiders does NOT show, publish, promote, or endorse Grey Market Premium (GMP) data.</strong>
+        </p>
+        <p>
+          Any <strong className="text-[#111827]">Unlisted Price</strong> or pre-listing indicative reference figures displayed on this platform represent informal, unregulated market reference observations tracked solely for educational and informational awareness before an initial public offering lists on NSE or BSE.
         </p>
         <ul className="list-disc pl-5 space-y-1.5 text-[#4B5563]">
-          <li>GMP is <strong className="text-[#111827]">NOT</strong> an exchange-confirmed transaction or settlement price.</li>
-          <li>GMP can change rapidly and without notice due to dealer rumors, market liquidity, and secondary index fluctuations.</li>
-          <li>A positive GMP does <strong className="text-[#111827]">NOT</strong> guarantee a listing gain, nor does a negative GMP guarantee a listing discount.</li>
-          <li>Historical GMP observations must not be construed as future performance indicators.</li>
+          <li>Unlisted Price references are <strong className="text-[#111827]">NOT</strong> Grey Market Premium (GMP) and are <strong className="text-[#111827]">NOT</strong> exchange-confirmed transaction or settlement prices.</li>
+          <li>Unlisted Price indicators can fluctuate rapidly without notice based on market liquidity, sentiment, and broader index movements.</li>
+          <li>A positive Unlisted Price spread does <strong className="text-[#111827]">NOT</strong> guarantee a listing gain, nor does a negative spread guarantee a listing discount.</li>
+          <li>Historical Unlisted Price observations must not be construed as future performance indicators or investment advice.</li>
         </ul>
       </div>
 

@@ -3,7 +3,189 @@
 // Adheres strictly to SEBI & Indian Exchange accounting conventions
 // =====================================================================
 
-import { IPO, GMPSnapshot, ListingResult } from '../types/ipo';
+import {
+  IPO,
+  IPOStatus,
+  GMPSnapshot,
+  ListingResult,
+  CategoryLotLimitsMap,
+  InvestorLotCategory,
+  MinInvestmentMultiples,
+} from '../types/ipo';
+
+export const INVESTOR_LOT_CATEGORIES: InvestorLotCategory[] = [
+  'Retail',
+  'Employee',
+  'Shareholder',
+  'sHNI',
+  'bHNI',
+  'QIB',
+];
+
+/**
+ * Calculates standard Indian SEBI/Exchange default lot limits for Retail, sHNI, and bHNI
+ * from the lot size and upper band / issue price.
+ */
+export function calculateDefaultSEBILotLimits(
+  lotSize?: number,
+  pricePerShare?: number,
+  category: 'Mainboard' | 'SME' = 'Mainboard'
+): CategoryLotLimitsMap {
+  if (!lotSize || lotSize <= 0 || !pricePerShare || pricePerShare <= 0) {
+    return {
+      Retail: { min_lots: 1, max_lots: 13 },
+      sHNI: { min_lots: 14, max_lots: 66 },
+      bHNI: { min_lots: 67 },
+    };
+  }
+
+  const singleLotValue = lotSize * pricePerShare;
+
+  if (category === 'SME') {
+    const retailLots = singleLotValue <= 200000 ? 1 : 1;
+    const hniMin = retailLots + 1;
+    return {
+      Retail: { min_lots: retailLots, max_lots: retailLots },
+      sHNI: { min_lots: hniMin },
+    };
+  }
+
+  const retailMax = Math.max(1, Math.floor(200000 / singleLotValue));
+  const sHniMin = retailMax + 1;
+  const sHniMax = Math.max(sHniMin, Math.floor(1000000 / singleLotValue));
+  const bHniMin = sHniMax + 1;
+
+  return {
+    Retail: { min_lots: 1, max_lots: retailMax },
+    sHNI: { min_lots: sHniMin, max_lots: sHniMax },
+    bHNI: { min_lots: bHniMin },
+  };
+}
+
+/**
+ * Returns normalized category lot limits for display using strictly Admin-configured limits.
+ * Returns an empty map if no limits were entered by Admin (no default data injected).
+ */
+export function getEffectiveCategoryLotLimits(ipo: {
+  category?: 'Mainboard' | 'SME';
+  lot_size?: number;
+  issue_price?: number;
+  price_band_max?: number;
+  category_lot_limits?: CategoryLotLimitsMap;
+}): { limits: CategoryLotLimitsMap; isAdminConfigured: boolean } {
+  const configured = ipo.category_lot_limits;
+  if (configured) {
+    const cleaned: CategoryLotLimitsMap = {};
+    let hasAny = false;
+    for (const cat of INVESTOR_LOT_CATEGORIES) {
+      const entry = configured[cat];
+      if (!entry) continue;
+      const minLots =
+        typeof entry.min_lots === 'number' && Number.isFinite(entry.min_lots) && entry.min_lots > 0
+          ? Math.floor(entry.min_lots)
+          : undefined;
+      const maxLots =
+        typeof entry.max_lots === 'number' && Number.isFinite(entry.max_lots) && entry.max_lots > 0
+          ? Math.floor(entry.max_lots)
+          : undefined;
+      if (minLots !== undefined || maxLots !== undefined) {
+        cleaned[cat] = { min_lots: minLots, max_lots: maxLots };
+        hasAny = true;
+      }
+    }
+    if (hasAny) {
+      return { limits: cleaned, isAdminConfigured: true };
+    }
+  }
+
+  return {
+    limits: {},
+    isAdminConfigured: false,
+  };
+}
+
+/**
+ * Returns today's calendar date in Asia/Kolkata (IST) as YYYY-MM-DD.
+ */
+export function getTodayISTDateString(referenceDate: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(referenceDate);
+}
+
+/**
+ * Extracts a strict YYYY-MM-DD calendar date from a date or ISO string.
+ */
+export function normalizeDateOnly(dateStr?: string | null): string | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const trimmed = dateStr.trim();
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return getTodayISTDateString(parsed);
+}
+
+/**
+ * Automatically derives IPO lifecycle status (upcoming, ongoing/open, closed, listed)
+ * from the entered Open, Close, and Listing dates against today's IST date.
+ */
+export function deriveIPOStatusFromDates(
+  input: {
+    open_date?: string | null;
+    close_date?: string | null;
+    listing_date?: string | null;
+    has_listing_result?: boolean;
+    fallback_status?: IPOStatus;
+  },
+  referenceDate: Date = new Date()
+): IPOStatus {
+  if (input.fallback_status === 'postponed' || input.fallback_status === 'withdrawn') {
+    return input.fallback_status;
+  }
+
+  if (input.has_listing_result) {
+    return 'listed';
+  }
+
+  const today = getTodayISTDateString(referenceDate);
+  const openDate = normalizeDateOnly(input.open_date);
+  const closeDate = normalizeDateOnly(input.close_date);
+  const listingDate = normalizeDateOnly(input.listing_date);
+
+  if (!openDate && !closeDate && !listingDate) {
+    return input.fallback_status || 'upcoming';
+  }
+
+  // 1. Listed: on or after listing date
+  if (listingDate && today >= listingDate) {
+    return 'listed';
+  }
+
+  // 2. Closed: strictly after close date (and before listing date if provided)
+  if (closeDate && today > closeDate) {
+    return 'closed';
+  }
+
+  // 3. Open (ongoing): on or after open date (and on or before close date if provided)
+  if (openDate) {
+    if (today >= openDate) {
+      return 'ongoing';
+    }
+    return 'upcoming';
+  }
+
+  // 4. Only close date provided (no open date): open up through close date
+  if (closeDate) {
+    return 'ongoing';
+  }
+
+  // 5. Only future listing date provided
+  return 'upcoming';
+}
 
 /**
  * Calculates actual listing gain or loss in Rupees.
@@ -181,28 +363,153 @@ export function calculateMinApplication(priceBandMax?: number, lotSize?: number)
   return priceBandMax * lotSize;
 }
 
+export interface InvestmentMultipleRow {
+  step: number;
+  lots: number;
+  shares: number;
+  amount: number;
+  label: string;
+}
+
+/**
+ * Resolves effective minimum investment (₹) preferring Admin-configured
+ * min_investment_multiples.min_amount, otherwise falling back to upper price * lot size.
+ */
+export function getEffectiveMinInvestment(ipo: {
+  price_band_max?: number;
+  issue_price?: number;
+  lot_size?: number;
+  min_investment_multiples?: MinInvestmentMultiples;
+}): number | null {
+  const m = ipo.min_investment_multiples;
+  if (m?.min_amount && m.min_amount > 0) {
+    return Math.round(m.min_amount);
+  }
+  const price = ipo.issue_price || ipo.price_band_max;
+  if (m?.min_shares && m.min_shares > 0 && price && price > 0) {
+    return Math.round(m.min_shares * price);
+  }
+  if (m?.min_lots && m.min_lots > 0 && ipo.lot_size && ipo.lot_size > 0 && price && price > 0) {
+    return Math.round(m.min_lots * ipo.lot_size * price);
+  }
+  return calculateMinApplication(price, ipo.lot_size);
+}
+
+/**
+ * Generates an ordered breakdown table of investment multiples (1x minimum, 2x, 3x, ...)
+ * from Admin-configured minimum investment multiples, lot size, and upper/issue price.
+ */
+export function buildInvestmentMultiplesSchedule(input: {
+  min_investment_multiples?: MinInvestmentMultiples;
+  lot_size?: number;
+  price_per_share?: number;
+  previewCount?: number;
+}): {
+  minLots: number;
+  multipleLots: number;
+  minShares: number;
+  multipleShares: number;
+  minAmount: number;
+  multipleAmount: number;
+  maxMultiples?: number;
+  rows: InvestmentMultipleRow[];
+} | null {
+  const m = input.min_investment_multiples;
+  if (!m) return null;
+
+  const lotSize = input.lot_size && input.lot_size > 0 ? Math.floor(input.lot_size) : 0;
+  const price = input.price_per_share && input.price_per_share > 0 ? input.price_per_share : 0;
+
+  const minLots = m.min_lots && m.min_lots >= 1 ? Math.floor(m.min_lots) : 1;
+  const multipleLots = m.multiple_lots && m.multiple_lots >= 1 ? Math.floor(m.multiple_lots) : 1;
+
+  const minShares =
+    m.min_shares && m.min_shares >= 1
+      ? Math.floor(m.min_shares)
+      : lotSize > 0
+      ? minLots * lotSize
+      : 0;
+  const multipleShares =
+    m.multiple_shares && m.multiple_shares >= 1
+      ? Math.floor(m.multiple_shares)
+      : lotSize > 0
+      ? multipleLots * lotSize
+      : minShares;
+
+  const minAmount =
+    m.min_amount && m.min_amount > 0
+      ? Math.round(m.min_amount)
+      : minShares > 0 && price > 0
+      ? Math.round(minShares * price)
+      : 0;
+  const multipleAmount =
+    m.multiple_amount && m.multiple_amount > 0
+      ? Math.round(m.multiple_amount)
+      : multipleShares > 0 && price > 0
+      ? Math.round(multipleShares * price)
+      : minAmount;
+
+  if (minShares <= 0 && minAmount <= 0) {
+    return null;
+  }
+
+  const maxMultiples =
+    m.max_multiples && m.max_multiples >= 1 ? Math.min(100, Math.floor(m.max_multiples)) : undefined;
+  const targetCount = maxMultiples
+    ? Math.min(maxMultiples, input.previewCount ?? 6)
+    : input.previewCount ?? 5;
+
+  const rows: InvestmentMultipleRow[] = [];
+  for (let i = 0; i < targetCount; i++) {
+    const lots = minLots + i * multipleLots;
+    const shares = minShares + i * multipleShares;
+    const amount = minAmount + i * multipleAmount;
+    rows.push({
+      step: i + 1,
+      lots,
+      shares,
+      amount,
+      label: i === 0 ? 'Minimum (1x)' : `${i + 1}x Multiple`,
+    });
+  }
+
+  // If maxMultiples exceeds the preview window, append the maximum cap row as well
+  if (maxMultiples && maxMultiples > targetCount) {
+    const idx = maxMultiples - 1;
+    rows.push({
+      step: maxMultiples,
+      lots: minLots + idx * multipleLots,
+      shares: minShares + idx * multipleShares,
+      amount: minAmount + idx * multipleAmount,
+      label: `Maximum (${maxMultiples}x)`,
+    });
+  }
+
+  return {
+    minLots,
+    multipleLots,
+    minShares,
+    multipleShares,
+    minAmount,
+    multipleAmount,
+    maxMultiples,
+    rows,
+  };
+}
+
 export const SEBI_PUBLIC_ISSUES_URL = 'https://www.sebi.gov.in/filings/public-issues.html';
 
 /**
- * Normalizes RHP / DRHP links to ensure they open the active official SEBI Public Issues portal:
- * https://www.sebi.gov.in/filings/public-issues.html
- * Handles dead .pdf links, empty URLs, or outdated SEBI file URLs.
+ * Validates and preserves an Admin-attached document URL (RHP / DRHP / Registrar).
+ * Returns undefined when no link is provided — never injects a default fallback link.
  */
-export function getValidDocUrl(url?: string | null): string {
-  if (!url || typeof url !== 'string' || !url.trim()) {
-    return SEBI_PUBLIC_ISSUES_URL;
-  }
+export function getValidDocUrl(url?: string | null): string | undefined {
+  if (!url || typeof url !== 'string') return undefined;
   const clean = url.trim();
-  // If url contains .pdf, doesn't start with http, or points to any SEBI path (many of which 404),
-  // guarantee the user lands on the official active SEBI Public Issues filing repository.
-  if (
-    clean.toLowerCase().includes('.pdf') ||
-    !clean.startsWith('http') ||
-    clean.includes('sebi.gov.in')
-  ) {
-    return SEBI_PUBLIC_ISSUES_URL;
-  }
-  return clean;
+  if (!clean) return undefined;
+  if (/^(javascript|data|vbscript):/i.test(clean)) return undefined;
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return `https://${clean}`;
 }
 
 /**

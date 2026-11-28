@@ -175,7 +175,7 @@ export const AllotmentCheckerModal: React.FC<AllotmentCheckerModalProps> = ({
   };
 
   const handleCheckAllSaved = () => {
-    if (savedPANs.length === 0) return;
+    if (savedPANs.length === 0 || !activeIpo) return;
     setChecking(true);
     setOutcomes([]);
     setTimeout(() => {
@@ -186,7 +186,7 @@ export const AllotmentCheckerModal: React.FC<AllotmentCheckerModalProps> = ({
 
   const handleCheckSingle = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identifier.trim()) return;
+    if (!identifier.trim() || !activeIpo) return;
     setChecking(true);
     setOutcomes([]);
     setTimeout(() => {
@@ -240,11 +240,15 @@ export const AllotmentCheckerModal: React.FC<AllotmentCheckerModalProps> = ({
               }}
               className="w-full h-10 text-sm font-medium border border-[#E5E7EB] rounded-lg px-3 bg-white text-[#111827] focus:outline-none focus:border-[#111827]"
             >
-              {ipos.map((ipo) => (
-                <option key={ipo.id} value={ipo.id}>
-                  {ipo.company?.name || ipo.slug} · {ipo.category} · {ipo.status.toUpperCase()}
-                </option>
-              ))}
+              {ipos.length === 0 ? (
+                <option value="">No IPOs published yet</option>
+              ) : (
+                ipos.map((ipo) => (
+                  <option key={ipo.id} value={ipo.id}>
+                    {ipo.company?.name || ipo.slug} · {ipo.category} · {ipo.status.toUpperCase()}
+                  </option>
+                ))
+              )}
             </select>
 
             {activeIpo && (
@@ -361,7 +365,7 @@ export const AllotmentCheckerModal: React.FC<AllotmentCheckerModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCheckAllSaved}
-                    disabled={checking}
+                    disabled={checking || !activeIpo}
                     className="w-full h-10 bg-[#111827] hover:bg-[#1F2937] text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     {checking ? (
@@ -418,7 +422,7 @@ export const AllotmentCheckerModal: React.FC<AllotmentCheckerModalProps> = ({
                 />
                 <button
                   type="submit"
-                  disabled={checking}
+                  disabled={checking || !activeIpo}
                   className="h-10 px-5 bg-[#111827] hover:bg-[#1F2937] disabled:opacity-60 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                 >
                   {checking ? (

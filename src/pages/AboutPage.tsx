@@ -27,7 +27,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ navigate }) => {
           <Database className="w-5 h-5 text-[#111827]" />
           <h3 className="font-semibold text-[#111827] text-base">Provable Provenance</h3>
           <p className="text-sm text-[#4B5563] leading-relaxed">
-            Every market observation, subscription multiple, and grey market quotation records its exact source, UTC ingestion timestamp, and verification status.
+            Every market observation, subscription multiple, and unlisted price reference records its exact source, UTC ingestion timestamp, and verification status.
           </p>
         </div>
 
@@ -88,7 +88,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ navigate }) => {
           <div className="flex items-start gap-3 p-3.5 bg-[#FAFAFA] rounded-lg border border-[#EAEAEA]">
             <span className="font-semibold text-[#111827] shrink-0">Priority 4:</span>
             <span>
-              <strong className="text-[#111827]">Grey Market Quotations:</strong> Informal broker and dealer circle observations tracked strictly as speculative community sentiment. Subject to admin review before inclusion.
+              <strong className="text-[#111827]">Unlisted Price References (Non-GMP):</strong> As per SEBI rules, we do not publish Grey Market Premium (GMP). Pre-listing unlisted price indicators are tracked solely as informational market references subject to admin review.
             </span>
           </div>
         </div>

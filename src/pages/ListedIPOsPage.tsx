@@ -11,6 +11,8 @@ import {
   SEBI_PUBLIC_ISSUES_URL,
 } from '../lib/calculations';
 import { ListingGainChart } from '../components/ListingGainChart';
+import { useSitePageContent } from '../lib/siteContent';
+import { PageNoticeBanner, PageExtraSections } from '../components/PageCustomSections';
 import { Search, ArrowUpDown, Filter, ChevronRight, FileText, ExternalLink } from 'lucide-react';
 
 interface ListedIPOsPageProps {
@@ -18,6 +20,7 @@ interface ListedIPOsPageProps {
 }
 
 export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
+  const pageContent = useSitePageContent('listed');
   const [ipos, setIPOs] = useState<IPO[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -90,65 +93,87 @@ export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
-      <div className="space-y-2 border-b border-[#EAEAEA] pb-6">
-        <h1 className="text-2xl sm:text-3xl font-semibold text-[#111827] tracking-tight">
-          Historical Listing Performance
+      <div className="space-y-2 border-b border-[#E6DFD3] pb-6">
+        {pageContent.eyebrow && (
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[#14532D]">
+            {pageContent.eyebrow}
+          </div>
+        )}
+        <h1 className="text-2xl sm:text-3xl font-display font-bold text-[#1C1917] tracking-tight">
+          {pageContent.title}
         </h1>
-        <p className="text-base text-[#4B5563] max-w-2xl leading-relaxed">
-          Verified IPO listing debut prices across NSE and BSE. Review issue prices against opening exchange rates.
-        </p>
+        {pageContent.subtitle && (
+          <p className="text-base text-[#57534E] max-w-2xl leading-relaxed">
+            {pageContent.subtitle}
+          </p>
+        )}
       </div>
 
+      <PageNoticeBanner
+        title={pageContent.notice_banner_title}
+        body={pageContent.notice_banner_body}
+      />
+
       {/* Visual Chart */}
-      <div className="bg-white border border-[#EAEAEA] rounded-xl p-6 space-y-3">
+      <div className="bg-white border border-[#E6DFD3] rounded-xl p-6 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#111827]">First-Day Listing Gains (%)</h2>
-          <span className="text-xs text-[#4B5563]">Verified exchange data</span>
+          <h2 className="text-lg font-display font-semibold text-[#1C1917]">
+            {pageContent.custom_fields.chart_heading || 'First-Day Listing Gains (%)'}
+          </h2>
+          <span className="text-xs text-[#78716C]">
+            {pageContent.custom_fields.chart_sublabel || 'Verified exchange data'}
+          </span>
         </div>
         <ListingGainChart ipos={ipos} />
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white border border-[#EAEAEA] rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E6DFD3] rounded-xl p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="relative flex-1">
           <input
             type="text"
-            placeholder="Search listed companies or symbols..."
+            placeholder={
+              pageContent.custom_fields.search_placeholder ||
+              'Search listed companies or symbols...'
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-9 pr-3 text-sm bg-[#FAFAFA] border border-[#E5E7EB] focus:border-[#111827] rounded-lg outline-none text-[#111827] transition-colors"
+            className="w-full h-10 pl-9 pr-3 text-sm bg-[#FAF7F1] border border-[#DFD6C7] focus:border-[#14532D] focus:bg-white rounded-lg outline-none text-[#1C1917] placeholder:text-[#78716C] transition-colors"
           />
-          <Search className="w-4 h-4 text-[#6B7280] absolute left-3 top-3 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#78716C] absolute left-3 top-3 pointer-events-none" />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 p-1 bg-[#FAFAFA] border border-[#EAEAEA] rounded-lg">
+          <div className="flex items-center gap-1 p-1 bg-[#EFE9DD] border border-[#E6DFD3] rounded-lg">
             <button
+              type="button"
               onClick={() => setPerformanceFilter('all')}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 performanceFilter === 'all'
-                  ? 'bg-[#111827] text-white font-medium'
-                  : 'text-[#4B5563] hover:text-[#111827]'
+                  ? 'bg-[#14532D] text-white font-medium'
+                  : 'text-[#57534E] hover:text-[#1C1917]'
               }`}
             >
               All
             </button>
             <button
+              type="button"
               onClick={() => setPerformanceFilter('gain')}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 performanceFilter === 'gain'
-                  ? 'bg-[#16A34A] text-white font-medium'
-                  : 'text-[#4B5563] hover:text-[#111827]'
+                  ? 'bg-[#15803D] text-white font-medium'
+                  : 'text-[#57534E] hover:text-[#1C1917]'
               }`}
             >
               Premium
             </button>
             <button
+              type="button"
               onClick={() => setPerformanceFilter('loss')}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 performanceFilter === 'loss'
-                  ? 'bg-[#DC2626] text-white font-medium'
-                  : 'text-[#4B5563] hover:text-[#111827]'
+                  ? 'bg-[#B91C1C] text-white font-medium'
+                  : 'text-[#57534E] hover:text-[#1C1917]'
               }`}
             >
               Discount
@@ -158,7 +183,7 @@ export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
           <select
             value={sortOption}
             onChange={(e) => setSortOption(e.target.value as any)}
-            className="h-10 px-3 text-sm bg-white border border-[#E5E7EB] rounded-lg text-[#111827] outline-none focus:border-[#111827]"
+            className="h-10 px-3 text-sm bg-[#FAF7F1] border border-[#DFD6C7] rounded-lg text-[#1C1917] outline-none focus:border-[#14532D] focus:bg-white"
           >
             <option value="gain_desc">Highest Gain (%)</option>
             <option value="gain_asc">Lowest Gain (%)</option>
@@ -171,9 +196,9 @@ export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto bg-white border border-[#EAEAEA] rounded-xl">
+      <div className="overflow-x-auto bg-white border border-[#E6DFD3] rounded-xl shadow-2xs custom-scrollbar">
         <table className="w-full text-left text-sm">
-          <thead className="bg-[#FAFAFA] border-b border-[#EAEAEA] text-[#4B5563] font-semibold text-xs">
+          <thead className="bg-[#FAF6EE] border-b border-[#E6DFD3] text-[#57534E] font-semibold text-xs">
             <tr>
               <th className="py-3.5 px-4">Company</th>
               <th className="py-3.5 px-3">Listing Date</th>
@@ -185,17 +210,18 @@ export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
               <th className="py-3.5 px-4 text-right">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EAEAEA] bg-white">
+          <tbody className="divide-y divide-[#F2ECE1] bg-white">
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-[#4B5563]">
+                <td colSpan={8} className="py-12 text-center text-[#57534E]">
                   Loading listed IPOs...
                 </td>
               </tr>
             ) : list.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-[#4B5563]">
-                  No listed IPO records match the selected criteria.
+                <td colSpan={8} className="py-12 text-center text-[#57534E]">
+                  {pageContent.custom_fields.empty_state_text ||
+                    'No listed IPO records match the selected criteria.'}
                 </td>
               </tr>
             ) : (
@@ -209,58 +235,61 @@ export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
                   <tr
                     key={ipo.id}
                     onClick={() => navigate(`/ipo/${ipo.slug}`)}
-                    className="hover:bg-[#FAFAFA] transition-colors cursor-pointer group"
+                    className="hover:bg-[#FAF7F1] transition-colors cursor-pointer group"
                   >
                     <td className="py-4 px-4">
-                      <div className="font-semibold text-[#111827] text-sm sm:text-[15px]">
+                      <div className="font-semibold text-[#1C1917] group-hover:text-[#14532D] transition-colors text-sm sm:text-[15px]">
                         {ipo.company?.name || ipo.slug}
                       </div>
-                      <div className="text-xs text-[#4B5563] flex items-center gap-1.5 mt-0.5">
-                        <span>{ipo.category}</span>
+                      <div className="text-xs text-[#57534E] flex items-center gap-1.5 mt-0.5">
+                        <span className={ipo.category === 'SME' ? 'text-[#9A5B13] font-medium' : 'text-[#14532D] font-medium'}>
+                          {ipo.category}
+                        </span>
                         <span aria-hidden="true">·</span>
                         <span>{ipo.exchange}</span>
                       </div>
                     </td>
 
-                    <td className="py-4 px-3 whitespace-nowrap tabular-nums text-sm text-[#4B5563]">
+                    <td className="py-4 px-3 whitespace-nowrap font-mono tabular-nums text-xs sm:text-sm text-[#57534E]">
                       {formatIndianDate(ipo.listing_date)}
                     </td>
 
-                    <td className="py-4 px-3 text-right tabular-nums text-[#111827]">
+                    <td className="py-4 px-3 text-right font-mono tabular-nums text-[#1C1917]">
                       ₹{res?.issue_price ?? ipo.issue_price ?? '-'}
                     </td>
 
-                    <td className="py-4 px-3 text-right tabular-nums font-medium text-[#111827]">
+                    <td className="py-4 px-3 text-right font-mono tabular-nums font-medium text-[#1C1917]">
                       ₹{res?.listing_price ?? '-'}
                     </td>
 
                     <td
-                      className={`py-4 px-3 text-right tabular-nums font-medium ${
-                        isProfit ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                      className={`py-4 px-3 text-right font-mono tabular-nums font-medium ${
+                        isProfit ? 'text-[#15803D]' : 'text-[#B91C1C]'
                       }`}
                     >
                       {isProfit ? `+₹${gain}` : `-₹${Math.abs(gain)}`}
                     </td>
 
                     <td
-                      className={`py-4 px-3 text-right tabular-nums font-semibold ${
-                        isProfit ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                      className={`py-4 px-3 text-right font-mono tabular-nums font-semibold ${
+                        isProfit ? 'text-[#15803D]' : 'text-[#B91C1C]'
                       }`}
                     >
                       {isProfit ? `+${gainPct}%` : `${gainPct}%`}
                     </td>
 
-                    <td className="py-4 px-3 text-right tabular-nums text-[#4B5563]">
+                    <td className="py-4 px-3 text-right font-mono tabular-nums text-[#57534E]">
                       {formatCrores(ipo.issue_size)}
                     </td>
 
                     <td className="py-4 px-4 text-right whitespace-nowrap">
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigate(`/ipo/${ipo.slug}`);
                         }}
-                        className="px-3.5 py-1.5 bg-white border border-[#E5E7EB] hover:bg-[#FAFAFA] hover:border-[#111827] text-[#111827] text-sm font-medium rounded-lg transition-colors"
+                        className="px-3.5 py-1.5 bg-[#FAF7F1] border border-[#DFD6C7] hover:bg-[#14532D] hover:border-[#14532D] hover:text-white text-[#1C1917] text-sm font-medium rounded-lg transition-colors"
                       >
                         Details
                       </button>
@@ -272,6 +301,8 @@ export const ListedIPOsPage: React.FC<ListedIPOsPageProps> = ({ navigate }) => {
           </tbody>
         </table>
       </div>
+
+      <PageExtraSections sections={pageContent.extra_sections} />
     </div>
   );
 };
